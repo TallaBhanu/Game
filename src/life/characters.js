@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { rand, pick } from '../core/util.js';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { spawn, ASSETS } from './assets.js';
 
 const limbGeo = new THREE.CapsuleGeometry(0.5, 0.6, 4, 10);
 limbGeo.scale(1, 1 / 1.6, 1);
@@ -137,6 +138,8 @@ export class Human {
       d.rotation.x = 0.1;
     }
 
+    this.bodyMeshes = [];
+    this.root.traverse((o) => { if (o.isMesh) this.bodyMeshes.push(o); });
     this.pose = opts.pose || 'idle';
     this.speed = 0;
     this.t = rand(0, 10);
@@ -189,6 +192,12 @@ export class Human {
         part('box', HAIR, 0.03, 0.08, 0.03, 0, 0.24, -0.08, H); // shikha tuft
         break;
     }
+  }
+
+  setBodyVisible(v) {
+    if (this._bodyVis === v) return;
+    this._bodyVis = v;
+    for (const m of this.bodyMeshes) m.visible = v;
   }
 
   attach(obj, where = 'handR') {
@@ -455,6 +464,31 @@ export class Elephant {
     const g = new THREE.Group();
     this.body = g;
     this.root.add(g);
+    if (ASSETS.elephant) {
+      // realistic elephant with a velvet blanket and a gilded howdah
+      this.real = spawn('elephant');
+      g.add(this.real.root);
+      this.real.play('idle', 0);
+      this.backY = 2.78;
+      if (royal) {
+        part('rbox', '#8c1520', 1.7, 0.06, 2.0, 0, this.backY, -0.15, g, mat('#8c1520', { roughness: 0.7 }));
+        for (const s of [-1, 1]) {
+          const c = part('rbox', '#8c1520', 0.05, 1.05, 1.9, s * 0.86, this.backY - 0.5, -0.15, g, mat('#8c1520', { roughness: 0.7 }));
+          c.rotation.z = s * 0.18;
+          part('rbox', '#e0b84a', 0.06, 0.1, 1.92, s * 0.95, this.backY - 1.02, -0.15, g, mat('#e0b84a', { metalness: 0.7, roughness: 0.35 }));
+        }
+        const hw = new THREE.Group();
+        hw.position.set(0, this.backY + 0.04, -0.3);
+        g.add(hw);
+        const gold = mat('#d9a62e', { metalness: 0.8, roughness: 0.35 });
+        part('rbox', '#d9a62e', 1.2, 0.55, 1.3, 0, 0.28, 0, hw, gold);
+        for (const [x, zz] of [[0.52, 0.56], [-0.52, 0.56], [0.52, -0.56], [-0.52, -0.56]]) part('cyl', '#e8c252', 0.035, 1.1, 0.035, x, 1.1, zz, hw, gold);
+        part('hemi', '#e8c252', 0.75, 0.55, 0.8, 0, 1.65, 0, hw, gold);
+        part('cone', '#e8c252', 0.07, 0.4, 0.07, 0, 2.35, 0, hw, gold);
+      }
+      this.speed = 0; this.t = 0; this.radius = 1.6;
+      return;
+    }
     const grey = '#6f6b68';
     part('sphere', grey, 1.05, 1.15, 1.75, 0, 2.55, 0, g);
     this.headG = new THREE.Group();
@@ -519,6 +553,11 @@ export class Elephant {
     this.radius = 1.6;
   }
   update(dt) {
+    if (this.real) {
+      this.real.play(this.speed > 0.15 ? 'walk' : 'idle', 0.5, Math.max(0.5, this.speed / 1.1));
+      this.real.mixer.update(dt);
+      return;
+    }
     this.t += dt;
     this.phase += dt * this.speed * 1.6;
     const amp = Math.min(1, this.speed) * 0.3;
@@ -533,6 +572,18 @@ export class Elephant {
     });
     this.headG.rotation.y = Math.sin(this.t * 0.5) * 0.08;
   }
+}
+
+/** A draught bull: the realistic model when loaded, else the simple ox. */
+export function draftBull(color) {
+  if (!ASSETS.bull) return new Ox(color);
+  const b = spawn('bull');
+  b.play('idle', 0);
+  b.mixer.update(Math.random() * 3);
+  return {
+    root: b.root, real: b, speed: 0,
+    update(dt) { b.play(this.speed > 0.1 ? 'walk' : 'idle', 0.3, Math.max(0.5, this.speed / 1.4)); b.mixer.update(dt); },
+  };
 }
 
 export class Ox {

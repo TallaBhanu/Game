@@ -1,11 +1,12 @@
 // Horses and bullock carts you can ride, plus traffic on the roads.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { Human, Ox, part, mat } from './characters.js';
+import { Human, part, mat, draftBull } from './characters.js';
 import { MATERIALS } from '../world/builder.js';
 import { ROAD, R_OUTER, PALACE, BAZAAR, TANK } from '../world/layout.js';
 import { clamp, lerp, rand, pick } from '../core/util.js';
 import { turnTowards, yawTo } from './npc.js';
+import { spawn, ASSETS } from './assets.js';
 
 export async function loadHorseModel() {
   const loader = new GLTFLoader();
@@ -88,7 +89,12 @@ export class Horse extends Mount {
     this.length = 2.4;
     this.maxSpeed = 15;
     this.label = 'horse';
-    if (gltf) {
+    if (ASSETS.horse) {
+      this.real = spawn('horse', { tint: coat === '#f2ece2' || coat === '#d8cfc0' ? null : null });
+      this.body.add(this.real.root);
+      this.real.play('idle', 0);
+      this.real.mixer.update(Math.random() * 5);
+    } else if (gltf) {
       const src = gltf.scene.getObjectByProperty('type', 'Mesh');
       if (!src.geometry.attributes.normal) src.geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(src.geometry, new THREE.MeshStandardMaterial({ vertexColors: true, color: coat, roughness: 0.55, metalness: 0, flatShading: true }));
@@ -105,14 +111,29 @@ export class Horse extends Mount {
     } else {
       part('sphere', coat, 0.45, 0.55, 1.1, 0, 1.4, 0, this.body);
     }
-    // saddle, saddle-cloth, reins
-    part('rbox', '#5a2e18', 0.5, 0.14, 0.62, 0, 1.73, -0.12, this.body, mat('#5a2e18', { roughness: 0.5 }));
-    const cloth = part('rbox', pick(['#9c1b25', '#2f6f8f', '#2a7a3b', '#e0a526']), 0.96, 0.05, 0.9, 0, 1.66, -0.12, this.body);
-    cloth.rotation.x = 0.04;
-    part('limb', '#3a2a1c', 0.025, 1.0, 0.025, 0, 1.85, 0.55, this.body).rotation.x = 1.2;
-    this.seat.position.set(0, 1.56, -0.12);
+    // saddle and a woven saddle-cloth
+    const sy = this.real ? 1.52 : 1.73, sz = this.real ? 0.05 : -0.12;
+    this.saddle = new THREE.Group();
+    this.body.add(this.saddle);
+    part('rbox', '#4a2614', 0.42, 0.12, 0.56, 0, sy, sz, this.saddle, mat('#4a2614', { roughness: 0.45 }));
+    part('rbox', '#4a2614', 0.3, 0.1, 0.08, 0, sy + 0.1, sz + 0.26, this.saddle, mat('#4a2614', { roughness: 0.45 }));
+    const cloth = part('rbox', pick(['#9c1b25', '#2f6f8f', '#2a7a3b', '#7a1c4f']), 0.82, 0.04, 0.78, 0, sy - 0.07, sz, this.saddle);
+    cloth.rotation.x = 0.03;
+    for (const s of [-1, 1]) part('rbox', '#e0b84a', 0.02, 0.32, 0.6, s * 0.41, sy - 0.22, sz, this.saddle, mat('#e0b84a', { roughness: 0.4, metalness: 0.6 }));
+    this.seat.position.set(0, sy + 0.04, sz);
   }
   update(dt) {
+    if (this.real) {
+      const s = Math.abs(this.speed);
+      if (s < 0.3) this.real.play('idle', 0.4);
+      else if (s < 7.5) this.real.play('trot', 0.3, clamp(s / 4.2, 0.35, 1.5));
+      else this.real.play('gallop', 0.3, clamp(s / 12, 0.7, 1.4));
+      this.real.mixer.update(dt);
+      // the saddle rides the horse's back
+      const bob = s < 0.3 ? 0 : Math.abs(Math.sin(this.real.mixer.time * (s < 7.5 ? 6.5 : 9))) * (s < 7.5 ? 0.06 : 0.1);
+      this.saddle.position.y = bob; this.seat.position.y = (this.seatBase ??= this.seat.position.y) + bob;
+      return;
+    }
     if (this.mixer) {
       const s = Math.abs(this.speed);
       this.action.timeScale = s < 0.2 ? 0 : clamp(0.35 + s / 11, 0.35, 1.35);
@@ -182,8 +203,8 @@ export class BullockCart extends Mount {
     }
     if (load === 'stone') part('rbox', '#9b9284', 1.1, 0.6, 1.3, 0, 1.37, -1.1, B, MATERIALS.granite);
     if (load === 'sacks') for (let i = 0; i < 4; i++) part('sphere', '#c9b48a', 0.3, 0.24, 0.42, (i % 2 ? 0.3 : -0.3), 1.3 + (i > 1 ? 0.3 : 0), -1.2 + (i % 2) * 0.2, B);
-    this.oxen = [new Ox(pick(['#ece6da', '#d9d0c0', '#bfb5a5'])), new Ox(pick(['#ece6da', '#d9d0c0', '#8a7a6a']))];
-    this.oxen.forEach((o, i) => { o.root.position.set(i ? -0.55 : 0.55, 0, 2.3); B.add(o.root); });
+    this.oxen = [draftBull(pick(['#ece6da', '#d9d0c0', '#bfb5a5'])), draftBull(pick(['#ece6da', '#d9d0c0', '#8a7a6a']))];
+    this.oxen.forEach((o, i) => { o.root.position.set(i ? -0.5 : 0.5, 0, o.real ? 2.55 : 2.3); B.add(o.root); });
     this.seat.position.set(0, 1.08, 0.2);
   }
   update(dt) {
@@ -199,6 +220,7 @@ export class Mounts {
     this.audio = audio;
     this.list = [];
     this.traffic = [];
+    this.drivers = [];
     const addHorse = (x, z, yaw) => {
       const h = new Horse(gltf, pick(COATS));
       h.place(physics, x, z, yaw);
@@ -227,6 +249,7 @@ export class Mounts {
       const h = new Human({ top: pick(['#f2ead8', null, '#e0a526']), bottom: '#efe6d2', head: 'turban', headColor: pick(['#f4efe2', '#e2b13c', '#c93a2a']) });
       h.pose = pose;
       scene.add(h.root);
+      this.drivers.push(h);
       return h;
     };
     const roadEnd = ROAD.cum[4]; // up to the bazaar

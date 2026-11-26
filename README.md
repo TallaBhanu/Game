@@ -5,6 +5,7 @@ An open-world, third-person exploration game in the browser, set in **Golconda F
 You ride in on horseback along the road from Bhagnagar and explore a living, fully built fort, on foot, on horseback or driving a bullock cart:
 
 - **Horses and bullock carts.** Press **F** next to one to mount it. Horses walk on with **W** and gallop with **Shift**; you steer with **A/D**. Carts are slow and steady. There are horses at the caravanserai outside Fateh Darwaza, by the palace and in the bazaar. Carts and patrolling horsemen travel the roads.
+- **Closer to the real Golconda.** You climb to the summit by the ~380 stone steps from Bala Hisar Darwaza (or the winding road), past the Badi Baoli stepwell. The royal palaces and the Rani Mahal (zenana, with its Persian niches) stand on a great platform at the foot of the hill, and the Nagina Bagh garden lies just inside the gate.
 - **The fort, complete.** Three rings of granite walls: the outer curtain with Fateh Darwaza and Banjara Darwaza, the middle wall with **Bala Hisar Darwaza** (the clapping portico stands just behind it, as at the real fort), and the summit citadel. Inside are the Habshi Kamans arches over the climb, the granaries, the Silah Khana armoury, the Ramdas cell, the Ibrahim Mosque, a Mahakali shrine and the Durbar Hall at the top.
 
 - **The Naya Qila works.** Outside the walls to the north-east, masons raise the first stretch of a new outer enclosure, block by block. Porters carry stones on their heads up an earthen ramp, a timber shear-leg crane hoists blocks while a rope team hauls, stone-dressers chip away in the yard, two men lever a boulder, and a pair of bullocks drag granite on a sledge. The wall really grows while you watch.
@@ -15,7 +16,9 @@ You ride in on horseback along the road from Bhagnagar and explore a living, ful
 - **Day and night.** A full day passes in about 16 minutes. Torches light up at dusk, and the stars come out at night.
 - **Sound.** All audio is generated in code: tabla in teental with a drone and a sarangi-like melody, kettle drums and horns, chisels clinking, the murmur of the bazaar, birds by day and crickets at night.
 
-It is built with [three.js]. Most of the geometry is procedural. Surfaces use real, CC0-licensed photo-scanned textures from [Poly Haven] (granite, red Deccan laterite soil, plaster, timber). The sky is a physically based daylight model that also lights the scene, and post-processing adds ambient occlusion and bloom. The horse model comes from the three.js examples. Press **G** to switch between high and fast graphics.
+People and animals are realistic, rigged 3D models (CC BY, from Sketchfab: see [CREDITS.md](CREDITS.md)): townsmen in kurtas, women in saris, Akhal-Teke horses, black Deccani draught bulls, the royal elephant, donkeys and camels. One set of Mixamo animations (walk, idle, run, dance, gestures) is retargeted onto every human body at runtime, with procedural pose layers for sitting, bowing, carrying loads on the head, hammering, drumming and riding. To keep it fast, the nearest ~34 people get realistic bodies and everyone further away is drawn with a light stand-in.
+
+It is built with [three.js]. The architecture is procedural. Surfaces use real, CC0-licensed photo-scanned textures from [Poly Haven] (granite, red Deccan laterite soil, plaster, timber). The sky is a physically based daylight model that also lights the scene, and post-processing adds ambient occlusion and bloom. The horse model comes from the three.js examples. Press **G** to switch between high and fast graphics.
 
 ## Run it
 
@@ -65,7 +68,13 @@ src/
   life/mounts.js       rideable horses + bullock carts, road traffic
   world/grass.js       instanced dry-grass tufts with wind
 public/textures/       CC0 PBR texture sets (Poly Haven)
-public/models/         glTF models
+public/models/         glTF models (prepared with tools/prepare-models.mjs)
+tools/                 model preparation scripts (rename bones, simplify, compress)
+viewer.html            dev-only model/pose viewer (npm run dev, then open /viewer.html)
+  life/assets.js       model loading + Mixamo retargeting
+  life/realistic.js    realistic human bodies + pose layers
+  life/crowd.js        level-of-detail pool for realistic people
+  life/animals.js      camels, donkeys, grazing bulls
 ```
 
 ## Better 3D models: the desktop pipeline

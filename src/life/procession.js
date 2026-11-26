@@ -75,7 +75,9 @@ export class Procession {
     // royal elephant with mahout
     this.elephant = new Elephant({ royal: true });
     const mahout = new Human({ top: null, bottom: '#efe6d2', head: 'turban', headColor: '#c93a2a', pose: 'sit' });
-    mahout.root.position.set(0, 3.35, 1.4);
+    if (this.elephant.real) mahout.root.position.set(0, this.elephant.backY + 0.05, 1.05);
+    else mahout.root.position.set(0, 3.35, 1.4);
+    mahout.pose = 'ride';
     this.elephant.body.add(mahout.root);
     this.mahout = mahout;
     this.pop.add(this.elephant, { role: 'elephant', talk: false });

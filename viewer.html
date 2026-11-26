@@ -1,0 +1,34 @@
+<!doctype html><html><head><meta charset="utf-8"><title>viewer</title><style>body{margin:0;background:#222}</style></head>
+<body><canvas id="c"></canvas><script type="module">
+import * as THREE from 'three';
+import { loadAssets, spawn, ASSETS } from '/src/life/assets.js';
+import { RealHuman } from '/src/life/realistic.js';
+const r = new THREE.WebGLRenderer({ canvas: document.getElementById('c'), antialias: true });
+r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping;
+const s = new THREE.Scene(); s.background = new THREE.Color('#9ab');
+s.add(new THREE.HemisphereLight('#fff', '#664', 1.5)); const d = new THREE.DirectionalLight('#fff', 2.5); d.position.set(3, 8, 6); s.add(d);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
+const q = new URLSearchParams(location.search);
+await loadAssets();
+if (q.get('fw')) globalThis.__fixW = parseFloat(q.get('fw'));
+if (q.get('fx')) globalThis.__fixX = parseFloat(q.get('fx'));
+const list = (q.get('m') || 'man:walk,woman:walk,noble:walk_noble,man:dance,horse:trot,elephant:walk,bull:walk,donkey:walk,camel:walk').split(',');
+const items = [];
+list.forEach((spec, i) => {
+  const [n, clip, pose] = spec.split(':');
+  if (pose) {
+    const h = new RealHuman(n, { dye: i % 7 }); h.root.position.x = (i - (list.length - 1) / 2) * 2.6; s.add(h.root);
+    items.push({ mixer: { update: (dt) => h.update(dt, { pose, speed: clip === 'walk' ? 1.3 : 0 }) } });
+    return;
+  }
+  const it = spawn(n); if (!it) { console.log('missing', n); return; }
+  it.root.position.x = (i - (list.length - 1) / 2) * 2.6; s.add(it.root);
+  const a = it.play(clip, 0); if (!a) console.log('no clip', n, clip, Object.keys(ASSETS.clips), ASSETS[n].animations.map(a=>a.name));
+  items.push(it);
+});
+s.add(new THREE.Mesh(new THREE.PlaneGeometry(100, 100).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#887' })));
+cam.position.set(0, parseFloat(q.get('cy') || 2.2), parseFloat(q.get('cz') || 16)); cam.lookAt(0, 1.2, 0);
+const t = parseFloat(q.get('t') || '0.4');
+const N = parseInt(q.get("n") || "5"); for (const it of items) { for (let k = 0; k < N; k++) it.mixer.update(t / N); }
+r.render(s, cam); window.done = true;
+</script></body></html>

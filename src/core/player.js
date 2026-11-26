@@ -4,6 +4,8 @@ import { Human } from '../life/characters.js';
 import { clamp } from './util.js';
 import { WORLD_R } from '../world/layout.js';
 import { turnTowards } from '../life/npc.js';
+import { RealHuman } from '../life/realistic.js';
+import { ASSETS } from '../life/assets.js';
 
 export class Player {
   constructor(scene, physics, camera) {
@@ -33,6 +35,22 @@ export class Player {
     this.emoteT = 0;
     this.camPos = new THREE.Vector3();
     this.radius = 0.38;
+  }
+
+  /** Swap the procedural body for a realistic one once the models are loaded. */
+  useRealBody(scene) {
+    if (!ASSETS.man) return;
+    this.real = new RealHuman('man', { dye: 'saffron' });
+    scene.add(this.real.root);
+    this.model.setBodyVisible(false);
+  }
+
+  syncReal(dt) {
+    if (!this.real) return;
+    const r = this.real.root;
+    this.model.root.getWorldPosition(r.position);
+    r.rotation.y = this.model.root.rotation.y;
+    this.real.update(dt, { speed: this.model.speed, pose: this.model.pose });
   }
 
   spawn(x, z, facing) {
@@ -87,6 +105,7 @@ export class Player {
       this.model.rideBounce = Math.abs(m.speed) / 8;
       this.model.speed = 0;
       this.model.update(dt);
+      this.syncReal(dt);
       // the camera swings round behind the mount when you ride and leave the mouse alone
       if (Math.abs(m.speed) > 1 && this.lastLook > 0.8) {
         let d = m.yaw + Math.PI - this.yaw;
@@ -179,6 +198,7 @@ export class Player {
     } else m.pose = 'idle';
     if (!this.grounded) { m.speed = 0.5; }
     m.update(dt);
+    this.syncReal(dt);
     this.updateCamera(dt);
   }
 

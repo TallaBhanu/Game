@@ -17,6 +17,9 @@ import { Bazaar } from './life/bazaar.js';
 import { Townsfolk } from './life/townsfolk.js';
 import { Mounts, loadHorseModel } from './life/mounts.js';
 import { Grass } from './world/grass.js';
+import { loadAssets } from './life/assets.js';
+import { Crowd } from './life/crowd.js';
+import { Animals } from './life/animals.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -64,7 +67,13 @@ const state = { coins: 60, inventory: [], zone: null, danceTime: 0, construction
 let world;
 
 async function buildWorld() {
-  const [horseModel] = await Promise.all([loadHorseModel(), preloadTextures()]);
+  const btn = document.getElementById('start');
+  const [horseModel] = await Promise.all([
+    Promise.resolve(null),
+    preloadTextures(),
+    loadAssets((f) => { btn.textContent = `Loading people & animals… ${Math.round(f * 100)}%`; }),
+  ]);
+  btn.textContent = 'Building the fort…';
   initMaterials();
   const physics = new Physics();
   buildTerrain(scene);
@@ -95,9 +104,13 @@ async function buildWorld() {
   const sky = new Sky(scene, renderer);
   const mounts = new Mounts(scene, physics, pop, audio, fort, horseModel);
   const grass = new Grass(scene, physics, quality.high ? 1 : 0.45);
+  const crowd = new Crowd(scene, pop);
+  crowd.extra = [...mounts.drivers, procession.mahout];
+  const animals = new Animals(scene, physics);
   const player = new Player(scene, physics, camera);
   player.spawn(444, 0.5, -Math.PI / 2);
   player.mountOn(mounts.playerHorse);
+  player.useRealBody(scene);
   hud.buildMapImage(fort);
   // a handful of warm lights for night time in the busiest places
   const lights = [];
@@ -107,7 +120,7 @@ async function buildWorld() {
     scene.add(l);
     lights.push(l);
   }
-  world = { physics, fort, pop, construction, procession, dance, bazaar, town, sky, player, lights, mounts, grass };
+  world = { physics, fort, pop, construction, procession, dance, bazaar, town, sky, player, lights, mounts, grass, crowd, animals };
 }
 
 // ------------------------------------------------------------ helpers --
@@ -295,6 +308,8 @@ function frame() {
   W.bazaar.update(dt, elapsed, king);
   W.town.update(dt, king);
   pop.update(dt, camera.position);
+  W.crowd.update(dt, camera.position);
+  W.animals.update(dt, camera.position);
   sky.update(dt, player.pos);
   W.grass.update(dt, camera.position);
   W.fort.update(dt, elapsed, sky.night);

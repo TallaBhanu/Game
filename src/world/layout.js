@@ -74,7 +74,10 @@ export const CITADEL_GATE = { x: 0, z: R_CITADEL, angle: Math.PI / 2 };
 
 export const BAZAAR = { x0: 136, x1: 176, z: 0, halfWidth: 9 };
 export const DANCE = { x: 128, z: -78, size: 14 };
-export const PALACE = { x: -34, z: 152 };
+export const PALACE = { x: 70, z: 50 };        // royal palaces + Rani Mahal at the foot of the hill
+export const NAGINA_BAGH = { x: 96, z: -16 };  // the royal garden just inside Bala Hisar Darwaza
+export const BAOLI = { x: 86, z: 15 };         // Badi Baoli, the great stepwell beside the steps
+export const STEPS = { x0: 104, x1: 44, z: 0, w: 4.5 }; // the ~380 steps up to Bala Hisar
 export const BALA_HISAR = { x: 0, z: 0 };
 export const BALA_HISAR_GATE = { x: R_MIDDLE, z: 0 };
 export const PORTICO = { x: R_MIDDLE - 9, z: 0 }; // the clapping portico behind Bala Hisar Darwaza
@@ -89,7 +92,8 @@ export const FLATS = [
   { x: STABLE_X, z: 22, r: 26 },       // stables
   { x: 190, z: 0, r: 20 },             // gate
   { x: DANCE.x, z: DANCE.z, r: 18 },
-  { x: PALACE.x, z: PALACE.z, r: 22 },
+  { x: PALACE.x, z: PALACE.z, r: 26 },
+  { x: NAGINA_BAGH.x, z: NAGINA_BAGH.z, r: 12 },
   { x: CONSTRUCTION.mid.x + CONSTRUCTION.inward.x * 14, z: CONSTRUCTION.mid.z + CONSTRUCTION.inward.z * 14, r: 30 },
   { x: 0, z: 0, r: 30 },               // summit plateau
   { x: TANK.x, z: TANK.z, r: 22 },
@@ -104,23 +108,15 @@ const viewPt = {
 };
 export const PROCESSION_STOPS = [];
 export const PROCESSION = (() => {
-  const roadStart = 5; // index of {118,0} in ROAD
-  const up = ROAD.pts.slice(roadStart);
-  const toBazaar = [
-    { x: PALACE.x + 4, z: PALACE.z - 16 },
-    { x: 10, z: 150 },
-    { x: 60, z: 140 },
-    { x: 112, z: 104 },
-    { x: 142, z: 52 },
-    { x: 150, z: 10 },
-  ];
-  const outAndBack = [{ x: 160, z: 0 }, { x: 200, z: 0 }, { x: 226, z: -12 }, { x: 222, z: -60 }, viewPt];
-  const back = [{ x: 222, z: -60 }, { x: 226, z: -12 }, { x: 200, z: 0 }, { x: 150, z: 0 }];
-  const pts = [...toBazaar, ...outAndBack];
+  const up = ROAD.pts.slice(6); // from under the portico to the hall steps
+  const toGate = [{ x: PALACE.x + 2, z: PALACE.z - 16 }, { x: 96, z: 18 }, { x: 108, z: 6 }];
+  const out = [{ x: R_MIDDLE - 9, z: 0 }, { x: R_MIDDLE, z: 0 }, { x: 150, z: 0 }, { x: 200, z: 0 }, { x: 226, z: -12 }, { x: 222, z: -60 }, viewPt];
+  const back = [{ x: 222, z: -60 }, { x: 226, z: -12 }, { x: 200, z: 0 }, { x: 150, z: 0 }, { x: R_MIDDLE, z: 0 }];
+  const pts = [...toGate, ...out];
   const viewIdx = pts.length - 1;
   pts.push(...back, ...up);
   const topIdx = pts.length - 1;
-  pts.push(...up.slice(0, -1).reverse(), { x: 150, z: 0 }, ...toBazaar.slice(0, -1).reverse());
+  pts.push(...up.slice(0, -1).reverse(), ...toGate.slice(0, -1).reverse());
   const path = new Path(pts);
   PROCESSION_STOPS.push(
     { s: path.cum[viewIdx], dur: 26, label: 'inspects the rising walls' },
@@ -141,7 +137,10 @@ export const ZONES = [
   { name: 'Caravanserai', sub: 'Stables and travellers\' rest', x: STABLE_X, z: 22, r: 22 },
   { name: 'Nritya Mandap', sub: 'The dance court', x: DANCE.x, z: DANCE.z, r: 20 },
   { name: 'Naya Qila Works', sub: 'Masons raising the new outer wall', x: viewPt.x + CONSTRUCTION.inward.x * -18, z: viewPt.z + CONSTRUCTION.inward.z * -18, r: 34 },
-  { name: 'Royal Palace', sub: 'Residence of the Sultan', x: PALACE.x, z: PALACE.z, r: 20 },
+  { name: 'Royal Palaces & Rani Mahal', sub: 'The Sultan\'s residence and the zenana', x: PALACE.x, z: PALACE.z, r: 22 },
+  { name: 'Nagina Bagh', sub: 'Garden of the royal ladies', x: NAGINA_BAGH.x, z: NAGINA_BAGH.z, r: 9 },
+  { name: 'Badi Baoli', sub: 'The great stepwell', x: BAOLI.x, z: BAOLI.z, r: 8 },
+  { name: 'The 380 Steps', sub: 'The stair to Bala Hisar', x: (STEPS.x0 + STEPS.x1) / 2, z: 0, r: 26 },
   { name: 'Mahakali Shrine', sub: 'An old Kakatiya-era temple', x: TEMPLE.x, z: TEMPLE.z, r: 8 },
   { name: 'Step Tank', sub: 'Water for the fort', x: TANK.x, z: TANK.z, r: 20 },
   { name: 'Golconda', sub: 'The inner fort', x: 0, z: 0, r: R_MIDDLE - 3 },

@@ -5,7 +5,7 @@ import { CONSTRUCTION, WALL_H, WALL_T } from '../world/layout.js';
 import { terrainHeight } from '../world/terrain.js';
 import { granite } from '../core/textures.js';
 import { MATERIALS, boxGeo } from '../world/builder.js';
-import { Human, Ox, Props, part } from './characters.js';
+import { Human, Props, part, draftBull } from './characters.js';
 import { rand, pick, clamp, lerp } from '../core/util.js';
 import { yawTo, turnTowards } from './npc.js';
 
@@ -279,7 +279,7 @@ export class Construction {
     this.waterTarget = null;
     // ox team
     this.oxGroup = new THREE.Group();
-    const ox1 = new Ox('#ece6da'), ox2 = new Ox('#d9d0c0');
+    const ox1 = draftBull('#ece6da'), ox2 = draftBull('#d9d0c0');
     ox1.root.position.x = 0.55; ox2.root.position.x = -0.55;
     this.oxGroup.add(ox1.root, ox2.root);
     this.oxen = [ox1, ox2];

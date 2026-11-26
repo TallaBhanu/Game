@@ -4,7 +4,7 @@ import { terrainHeight } from './terrain.js';
 import { boxGeo, arcadeGeo, StaticBatch, MATERIALS } from './builder.js';
 import {
   R_OUTER, R_CITADEL, R_MIDDLE, WALL_H, WALL_T, BASTION_ANGLES, GATES, CONSTRUCTION, ROAD, PROCESSION,
-  BAZAAR, DANCE, PALACE, PORTICO, TEMPLE, TANK, WORLD_R, STABLE,
+  BAZAAR, DANCE, PALACE, PORTICO, TEMPLE, TANK, WORLD_R, STABLE, NAGINA_BAGH, BAOLI, STEPS,
 } from './layout.js';
 import { rand, rng, pick, clamp, TAU } from '../core/util.js';
 
@@ -143,9 +143,9 @@ export class Fort {
     for (let i = 0; i < n; i++) {
       const A = pts[i], B = pts[(i + 1) % n];
       const mz = (A.z + B.z) / 2, mx = (A.x + B.x) / 2;
-      if (mz > 30 && Math.abs(mx) < 6) {
-        // gate segment: leave an opening of 6 m
-        const gx = 0, gz = (A.z + B.z) / 2;
+      if ((mz > 30 && Math.abs(mx) < 6) || (mx > 30 && Math.abs(mz) < 6)) {
+        // gate segment (south for the road, east for the steps): a 7 m opening
+        const gx = (A.x + B.x) / 2, gz = (A.z + B.z) / 2;
         const ux = (B.x - A.x) / Math.hypot(B.x - A.x, B.z - A.z), uz = (B.z - A.z) / Math.hypot(B.x - A.x, B.z - A.z);
         this.wallSegment(A.x, A.z, gx - ux * 3.5, gz - uz * 3.5, 7, 3);
         this.wallSegment(gx + ux * 3.5, gz + uz * 3.5, B.x, B.z, 7, 3);
@@ -159,7 +159,8 @@ export class Fort {
         }
         this.bastion(gx - ux * 5.5, gz - uz * 5.5, 2.6, 10);
         this.bastion(gx + ux * 5.5, gz + uz * 5.5, 2.6, 10);
-        this.torches.push({ x: gx - ux * 3, y: base + 4, z: gz + 2 }, { x: gx + ux * 3, y: base + 4, z: gz + 2 });
+        const ox = gx / R_CITADEL * 2, oz = gz / R_CITADEL * 2;
+        this.torches.push({ x: gx - ux * 3 + ox, y: base + 4, z: gz - uz * 3 + oz }, { x: gx + ux * 3 + ox, y: base + 4, z: gz + uz * 3 + oz });
       } else {
         this.wallSegment(A.x, A.z, B.x, B.z, 7, 3);
       }
@@ -360,42 +361,134 @@ export class Fort {
   }
 
   palace() {
+    // The royal palaces at the foot of the hill: a great platform carrying
+    // the Sultan's hall, the Rani Mahal (zenana) with its niched walls, and
+    // a walled forecourt facing the steps.
     const { x, z } = PALACE;
     const base = terrainHeight(x, z);
-    // main block facing north (toward the hill)
-    const W = 26, D = 12, H = 6.5;
-    this.batch.box(W + 2, 1.2 + 3, D + 2, x, base + 0.6 - 1.5, z, 0, 'graniteWarm');
-    const fz = z - D / 2;
-    const { geo } = arcadeGeo(W, H, 1, 7, 2.4, 4.6);
-    this.batch.add(geo, 'plasterRose', x, base + 1.2, fz, 0);
-    this.batch.box(W, H, 1, x, base + 1.2 + H / 2, z + D / 2, 0, 'plasterRose');
-    this.batch.box(1, H, D, x - W / 2, base + 1.2 + H / 2, z, 0, 'plasterRose');
-    this.batch.box(1, H, D, x + W / 2, base + 1.2 + H / 2, z, 0, 'plasterRose');
-    this.batch.box(W - 1, 0.2, D - 1, x, base + 1.3, z, 0, 'floor', 4);
-    this.batch.box(W + 1, 0.6, D + 1, x, base + 1.2 + H + 0.3, z, 0, 'plasterWhite');
-    // upper pavilion
-    const { geo: g2 } = arcadeGeo(12, 4, 0.8, 5, 1.6, 2.9);
-    this.batch.add(g2, 'plasterWhite', x, base + 1.8 + H, fz + 3, 0);
-    this.batch.box(12, 4, 0.8, x, base + 1.8 + H + 2, z + 2, 0, 'plasterWhite');
-    this.batch.box(0.8, 4, 6, x - 6, base + 1.8 + H + 2, fz + 6, 0, 'plasterWhite');
-    this.batch.box(0.8, 4, 6, x + 6, base + 1.8 + H + 2, fz + 6, 0, 'plasterWhite');
-    this.batch.box(13, 0.4, 7, x, base + 1.8 + H + 4.2, fz + 5.5, 0, 'plasterWhite');
-    for (const sx of [-1, 1]) {
-      this.batch.add(GEO.dome(1.6), 'plasterWhite', x + sx * 4, base + 1.8 + H + 4.4, fz + 5.5);
-      this.batch.add(GEO.cyl(0.8, 0.9, 9, 8), 'plasterRose', x + sx * (W / 2), base + 1.2 + 4.5, fz);
-      this.batch.add(GEO.dome(1.0), 'plasterWhite', x + sx * (W / 2), base + 1.2 + 9, fz);
+    const PH = 2.2; // the massive platform
+    this.batch.box(38, PH + 3, 26, x, base + PH / 2 - 1.5, z, 0, 'graniteWarm');
+    this.physics.addPlatform(x, z, 19, 13, 0, base + PH);
+    // broad steps up to the platform on the north side
+    for (let i = 0; i < 6; i++) {
+      const h = PH * (1 - i / 6);
+      this.batch.box(10, h, 0.7, x, base + h / 2, z - 13 - 0.35 - i * 0.7, 0, 'graniteWarm', 2);
     }
-    this.physics.addBox(x, z, W / 2 + 1, D / 2 + 1, 0, base + 20);
-    // garden forecourt: low wall and fountain
-    const gz = fz - 9;
-    this.batch.box(W + 6, 0.8, 0.5, x, base + 0.4, gz - 7, 0, 'plasterRose');
-    this.batch.add(GEO.cyl(2.2, 2.4, 0.7, 16), 'granite', x, base + 0.35, gz);
-    this.batch.add(GEO.cyl(0.25, 0.3, 1.6, 8), 'granite', x, base + 1.0, gz);
-    this.physics.addCircle(x, gz, 2.4, base + 0.75);
-    this.fountain = { x, y: base + 1.8, z: gz };
-    this.torches.push({ x: x - 3, y: base + 3.2, z: fz - 1 }, { x: x + 3, y: base + 3.2, z: fz - 1 });
-    this.flagPole(x, base + 1.8 + H + 4.4, fz + 5.5, '#2a7a3b', 5);
-    this.reserved.push({ x, z, r: 22 }, { x, z: gz, r: 10 });
+    this.physics.addPlatform(x, z - 13 - 2.1, 5, 2.1, 0, base, base + PH);
+    const y0 = base + PH;
+    // Sultan's hall (north half): arcaded front, two storeys
+    const fz = z - 6;
+    const { geo } = arcadeGeo(22, 7, 1, 7, 2.2, 4.8);
+    this.batch.add(geo, 'plasterRose', x, y0, fz, 0);
+    this.batch.box(22, 7, 1, x, y0 + 3.5, fz + 8, 0, 'plasterRose');
+    this.batch.box(1, 7, 8, x - 11, y0 + 3.5, fz + 4, 0, 'plasterRose');
+    this.batch.box(1, 7, 8, x + 11, y0 + 3.5, fz + 4, 0, 'plasterRose');
+    this.batch.box(21, 0.2, 7.6, x, y0 + 0.1, fz + 4, 0, 'floor', 4);
+    this.batch.box(23, 0.6, 9, x, y0 + 7.3, fz + 4, 0, 'plasterWhite');
+    const { geo: g2 } = arcadeGeo(12, 4.2, 0.8, 5, 1.6, 3);
+    this.batch.add(g2, 'plasterWhite', x, y0 + 7.6, fz + 1.5, 0);
+    this.batch.box(12, 4.2, 0.8, x, y0 + 9.7, fz + 6.5, 0, 'plasterWhite');
+    this.batch.box(0.8, 4.2, 5, x - 6, y0 + 9.7, fz + 4, 0, 'plasterWhite');
+    this.batch.box(0.8, 4.2, 5, x + 6, y0 + 9.7, fz + 4, 0, 'plasterWhite');
+    this.batch.box(13, 0.4, 6, x, y0 + 11.9, fz + 4, 0, 'plasterWhite');
+    for (const sx of [-1, 1]) {
+      this.batch.add(GEO.dome(1.5), 'plasterWhite', x + sx * 3.5, y0 + 12.1, fz + 4);
+      this.batch.add(GEO.cyl(0.8, 0.9, 10, 8), 'plasterRose', x + sx * 11.5, y0 + 5, fz);
+      this.batch.add(GEO.dome(1.0), 'plasterWhite', x + sx * 11.5, y0 + 10, fz);
+    }
+    this.physics.addBox(x, fz + 4, 11.5, 4.5, 0, y0 + 14);
+    // Rani Mahal (south half): an inner court ringed by niched walls
+    const rz = z + 7;
+    for (const [cx, cz, w, d] of [[x, rz + 5.5, 30, 1], [x - 15, rz, 1, 12], [x + 15, rz, 1, 12]]) {
+      this.batch.box(w, 8, d, cx, y0 + 4, cz, 0, 'plasterOchre');
+      this.physics.addBox(cx, cz, w / 2, d / 2, 0, y0 + 8);
+    }
+    // the decorative Persian niches along the zenana wall
+    for (let i = 0; i < 9; i++) {
+      const nx = x - 12 + i * 3;
+      this.batch.box(1.4, 2.6, 0.15, nx, y0 + 2.2, rz + 4.95, 0, 'dark');
+      this.batch.add(GEO.dome(0.7), 'plasterOchre', nx, y0 + 3.5, rz + 4.95, 0, 0, 0, 1, 0.8, 0.25);
+      this.batch.box(1.0, 1.6, 0.15, nx, y0 + 5.6, rz + 4.95, 0, 'dark');
+    }
+    // fountain pool in the zenana court
+    this.batch.box(6, 0.5, 4, x, y0 + 0.25, rz, 0, 'graniteWarm', 2);
+    this.physics.addBox(x, rz, 3, 2, 0, y0 + 0.5);
+    this.fountain = { x, y: y0 + 1, z: rz };
+    this.torches.push({ x: x - 3, y: y0 + 3, z: fz - 1 }, { x: x + 3, y: y0 + 3, z: fz - 1 });
+    this.flagPole(x, y0 + 12.1, fz + 4, '#2a7a3b', 5);
+    this.palaceFloorY = y0;
+    this.reserved.push({ x, z, r: 26 });
+    // Akkanna-Madanna offices: a plain two-storey block near the palace gate
+    this.building(x + 26, z - 22, Math.PI * 0.25, 12, 7, 8, 'plasterOchre', { arches: 4 });
+    this.naginaBagh();
+    this.baoli();
+    this.steps();
+  }
+
+  naginaBagh() {
+    const { x, z } = NAGINA_BAGH;
+    const base = terrainHeight(x, z);
+    const W = 18, D = 14;
+    for (const [cx, cz, w, d] of [[x, z - D / 2, W, 0.6], [x - W / 2, z, 0.6, D], [x + W / 2, z, 0.6, D], [x - W / 4 - 1.5, z + D / 2, W / 2 - 3, 0.6], [x + W / 4 + 1.5, z + D / 2, W / 2 - 3, 0.6]]) {
+      this.batch.box(w, 1.4, d, cx, base + 0.7, cz, 0, 'graniteWarm', 2);
+      this.physics.addBox(cx, cz, w / 2, d / 2, 0, base + 1.4);
+    }
+    // cross-axial water channels (char bagh) and a central pool
+    this.batch.box(W - 2, 0.3, 1, x, base + 0.15, z, 0, 'granite', 2);
+    this.batch.box(1, 0.3, D - 2, x, base + 0.15, z, 0, 'granite', 2);
+    this.batch.box(3.4, 0.5, 3.4, x, base + 0.25, z, 0, 'graniteWarm', 2);
+    this.physics.addBox(x, z, 1.7, 1.7, 0, base + 0.5);
+    this.gardenWater = [{ x, z, w: W - 2.4, d: 0.6 }, { x, z, w: 0.6, d: D - 2.4 }, { x, z, w: 3, d: 3 }];
+    this.flowerBeds = [];
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) this.flowerBeds.push({ x: x + sx * W / 4, z: z + sz * D / 4, w: W / 2 - 2.5, d: D / 2 - 2.5 });
+    this.reserved.push({ x, z, r: 11 });
+  }
+
+  baoli() {
+    // Badi Baoli: a deep rectangular stepwell with steps on three sides
+    const { x, z } = BAOLI;
+    const base = terrainHeight(x, z);
+    const W = 12, D = 9;
+    for (let i = 0; i < 6; i++) {
+      const w = W - i * 1.3, d = D - i * 1.0, y = base - 0.55 * i;
+      for (const [ox, oz, bw, bd] of [[0, -d / 2, w, 0.65], [w / 2, 0, 0.65, d], [-w / 2, 0, 0.65, d]]) this.batch.box(bw, 0.55, bd, x + ox, y - 0.27, z + oz, 0, 'granite', 2);
+    }
+    this.batch.box(W, 6, 1, x, base - 2.5, z + D / 2, 0, 'granite', 2);
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(W - 6, D - 5), new THREE.MeshStandardMaterial({ color: '#2f5a5a', roughness: 0.08, metalness: 0.1 }));
+    water.rotation.x = -Math.PI / 2;
+    water.position.set(x, base - 3.0, z);
+    this.scene.add(water);
+    this.batch.box(W + 1, 0.9, 0.5, x, base + 0.45, z + D / 2 + 0.6, 0, 'granite', 2);
+    this.batch.box(0.5, 0.9, D + 1, x - W / 2 - 0.5, base + 0.45, z, 0, 'granite', 2);
+    this.batch.box(0.5, 0.9, D + 1, x + W / 2 + 0.5, base + 0.45, z, 0, 'granite', 2);
+    this.physics.addBox(x, z, W / 2 + 0.6, D / 2 + 0.6, 0, base + 0.9, base - 10);
+    this.reserved.push({ x, z, r: 9 });
+  }
+
+  steps() {
+    // ~380 stone steps climbing straight from the portico to Bala Hisar
+    const { x0, x1, z, w } = STEPS;
+    let count = 0;
+    let prev = terrainHeight(x0, z);
+    for (let x = x0; x > x1; x -= 0.32) {
+      const h = terrainHeight(x, z);
+      if (h - prev < 0.17 && x !== x0) continue;
+      this.batch.box(w, 0.45, 0.6, x, h - 0.05, z, 0, 'granite', 1.2);
+      prev = h;
+      count++;
+    }
+    // low parapets on both sides
+    const n = 12;
+    for (let i = 0; i < n; i++) {
+      const xa = x0 - ((x0 - x1) * i) / n, xb = x0 - ((x0 - x1) * (i + 1)) / n;
+      const ha = terrainHeight(xa, z), hb = terrainHeight(xb, z);
+      const len = Math.hypot(xb - xa, hb - ha);
+      for (const s of [-1, 1]) {
+        this.batch.add(boxGeo(len, 0.8, 0.45, 2), 'granite', (xa + xb) / 2, (ha + hb) / 2 + 0.45, z + s * (w / 2 + 0.25), 0, 0, Math.atan2(hb - ha, xa - xb) * -1);
+      }
+    }
+    this.stepCount = count;
+    for (let x = x1; x < x0; x += 10) this.reserved.push({ x, z, r: 5 });
   }
 
   tank() {
@@ -612,6 +705,7 @@ export class Fort {
     const rr = Math.hypot(x, z);
     if (rr > R_OUTER - 10 - r || rr < R_CITADEL + 8 + r) return false;
     if (Math.abs(rr - R_MIDDLE) < 9 + r) return false;
+    if (x > STEPS.x1 - 4 && x < STEPS.x0 + 6 && Math.abs(z) < 7 + r) return false;
     if (ROAD.distance(x, z) < 7 + r || PROCESSION.distance(x, z) < 6.5 + r) return false;
     if (x > BAZAAR.x0 - 14 && x < BAZAAR.x1 + 14 && Math.abs(z) < 22 + r) return false;
     if (Math.hypot(x - DANCE.x, z - DANCE.z) < 22 + r) return false;
