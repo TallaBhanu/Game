@@ -8,9 +8,10 @@
   --serif: 'Georgia', 'Iowan Old Style', 'Palatino Linotype', serif;
 }
 * { box-sizing: border-box; }
+html { color-scheme: dark; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1410; color: var(--paper); font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
 #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud { position: fixed; inset: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); pointer-events: none; }
 #hud button, #hud .panel, #dialog { pointer-events: auto; }
 
 #topleft { position: absolute; top: 16px; left: 16px; text-shadow: 0 1px 3px #000; }

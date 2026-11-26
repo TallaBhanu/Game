@@ -23,8 +23,9 @@ export class Input {
       else if (this.dragging) { this.look.dx += e.movementX * 1.5; this.look.dy += e.movementY * 1.5; }
     });
     canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 2 || !this.canLock) this.dragging = true;
-      else if (this.canLock && !this.locked && this.enabled) canvas.requestPointerLock?.();
+      // Dragging always looks around; pointer lock is a bonus where the browser allows it.
+      this.dragging = true;
+      if (e.button === 0 && this.canLock && !this.locked && this.enabled) this.lock();
     });
     addEventListener('mouseup', () => (this.dragging = false));
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -82,6 +83,13 @@ export class Input {
       b.addEventListener('touchstart', (e) => { e.preventDefault(); this.pressed.add(code); this.keys.add(code); });
       b.addEventListener('touchend', (e) => { e.preventDefault(); this.keys.delete(code); });
     }
+  }
+
+  lock() {
+    try {
+      const r = this.canvas.requestPointerLock?.();
+      if (r && r.catch) r.catch(() => {});
+    } catch { /* pointer lock unavailable: drag to look instead */ }
   }
 
   down(code) { return this.enabled && this.keys.has(code); }

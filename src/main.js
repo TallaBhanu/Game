@@ -308,7 +308,7 @@ setTimeout(() => {
 startBtn.addEventListener('click', () => {
   document.getElementById('intro').classList.add('hide');
   audio.start();
-  if (input.canLock) canvas.requestPointerLock?.();
+  if (input.canLock) input.lock();
   setTimeout(() => hud.toast('Walk west through <b>Fateh Darwaza</b>. Press <b>J</b> for your journal, <b>M</b> for the map.'), 1200);
 });
 window.__game = () => world;
