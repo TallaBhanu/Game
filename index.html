@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Golconda 1518</title>
+<link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="topleft">
+    <div id="title-small">GOLCONDA · 1518</div>
+    <div id="time"></div>
+  </div>
+  <div id="topright"><span class="coin">◉</span> <span id="coins"></span></div>
+  <div id="banner"></div>
+  <div id="toasts"></div>
+  <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="keys-hint">[J] Journal · [M] Map · [H] Help</div>
+  <div id="prompt"></div>
+  <div id="dialog"></div>
+  <div id="journal" class="panel"><div class="p-head">Traveller's Journal <span class="x">[J]</span></div><div id="journalBody"></div></div>
+  <div id="mapPanel" class="panel"><div class="p-head">Golconda, 1518 <span class="sub">click a place to travel there</span> <span class="x">[M]</span></div><canvas id="bigmap"></canvas></div>
+  <div id="help" class="panel">
+    <div class="p-head">Controls <span class="x">[H]</span></div>
+    <table>
+      <tr><td>W A S D / arrows</td><td>Walk</td></tr>
+      <tr><td>Shift</td><td>Run</td></tr>
+      <tr><td>Space</td><td>Jump</td></tr>
+      <tr><td>Mouse</td><td>Look around (click to capture) · wheel to zoom</td></tr>
+      <tr><td>E</td><td>Talk / trade</td></tr>
+      <tr><td>1 · 2 · 3</td><td>Namaste · Dance · Clap</td></tr>
+      <tr><td>C</td><td>Clap (try it under the portico!)</td></tr>
+      <tr><td>J · M</td><td>Journal · Map &amp; fast travel</td></tr>
+      <tr><td>T</td><td>Let two hours pass</td></tr>
+      <tr><td>N</td><td>Mute / unmute</td></tr>
+      <tr><td>Esc</td><td>Close panel / release mouse</td></tr>
+    </table>
+  </div>
+  <div id="stick"><div id="knob"></div></div>
+  <div id="touch-buttons">
+    <button data-key="KeyE">E</button>
+    <button data-key="Space">⤒</button>
+    <button data-key="Digit1">🙏</button>
+    <button data-key="KeyC">👏</button>
+    <button data-key="KeyM">Map</button>
+    <button data-key="KeyJ">J</button>
+  </div>
+</div>
+
+<div id="intro">
+  <div class="intro-card">
+    <div class="eyebrow">Hyderabad · Deccan · Anno 1518</div>
+    <h1>Golconda</h1>
+    <p class="lede">Sultan Quli Qutb-ul-Mulk has declared his independence, and the old Kakatiya mud fort on the shepherd's hill is being reborn in granite. Masons haul stone up earthen ramps, merchants weigh pearls and diamonds in the bazaar, and every day the Sultan climbs the hill to see his walls rise.</p>
+    <p class="lede">You arrive at Fateh Darwaza with sixty gold huns and a curious eye.</p>
+    <div class="controls">
+      <span><b>WASD</b> walk</span><span><b>Shift</b> run</span><span><b>Mouse</b> look</span><span><b>E</b> talk</span><span><b>1/2/3</b> namaste · dance · clap</span><span><b>M</b> map</span><span><b>J</b> journal</span>
+    </div>
+    <button id="start" disabled>Building the fort…</button>
+  </div>
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

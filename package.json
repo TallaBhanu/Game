@@ -1,0 +1,18 @@
+{
+  "name": "golconda-1518",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Open-world exploration game set in Golconda Fort, Hyderabad, during its construction in the 1500s.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "vite": "5.4.11"
+  }
+}
