@@ -1,9 +1,17 @@
 // Procedural low-poly people and animals with simple joint animation.
 import * as THREE from 'three';
 import { rand, pick } from '../core/util.js';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+
+const limbGeo = new THREE.CapsuleGeometry(0.5, 0.6, 4, 10);
+limbGeo.scale(1, 1 / 1.6, 1);
+const rboxGeo = new RoundedBoxGeometry(1, 1, 1, 3, 0.3);
 
 const GEO = {
   box: new THREE.BoxGeometry(1, 1, 1),
+  limb: limbGeo,
+  rbox: rboxGeo,
+  eye: new THREE.SphereGeometry(1, 6, 5),
   sphere: new THREE.SphereGeometry(1, 12, 9),
   hemi: new THREE.SphereGeometry(1, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
   cyl: new THREE.CylinderGeometry(1, 1, 1, 10),
@@ -16,7 +24,7 @@ export function mat(color, opts) {
   const key = color + (opts ? JSON.stringify(opts) : '');
   let m = MATS.get(key);
   if (!m) {
-    m = new THREE.MeshLambertMaterial({ color, ...(opts || {}) });
+    m = new THREE.MeshStandardMaterial({ color, roughness: 0.82, metalness: 0, ...(opts || {}) });
     MATS.set(key, m);
   }
   return m;
@@ -24,7 +32,7 @@ export function mat(color, opts) {
 const skirtMat = new Map();
 function doubleMat(color) {
   let m = skirtMat.get(color);
-  if (!m) skirtMat.set(color, (m = new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide })));
+  if (!m) skirtMat.set(color, (m = new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.85 })));
   return m;
 }
 
@@ -64,23 +72,23 @@ export class Human {
     this.body = pivot(this.root, 0, 0.95, 0);
     const B = this.body;
 
-    part('box', bottom, 0.32, 0.18, 0.2, 0, 0, 0, B);
+    part('rbox', bottom, 0.32, 0.2, 0.21, 0, 0, 0, B);
     this.legs = [];
     for (const side of [1, -1]) {
       const hip = pivot(B, side * 0.09, -0.04, 0);
-      part('box', bottom, 0.14, 0.46, 0.15, 0, -0.22, 0, hip);
+      part('limb', bottom, 0.15, 0.5, 0.16, 0, -0.22, 0, hip);
       const knee = pivot(hip, 0, -0.45, 0);
-      part('box', opts.trousers ? bottom : skin, 0.11, 0.46, 0.12, 0, -0.22, 0, knee);
-      part('box', opts.shoes || '#3b2a1c', 0.11, 0.06, 0.23, 0, -0.47, 0.05, knee);
+      part('limb', opts.trousers ? bottom : skin, 0.11, 0.5, 0.12, 0, -0.22, 0, knee);
+      part('rbox', opts.shoes || '#3b2a1c', 0.11, 0.07, 0.24, 0, -0.47, 0.05, knee);
       this.legs.push({ hip, knee, side });
     }
 
     this.torso = pivot(B, 0, 0.08, 0);
     const T = this.torso;
-    part('box', top || skin, 0.34, 0.5, 0.2, 0, 0.24, 0, T);
-    if (opts.female) part('box', top || skin, 0.3, 0.12, 0.08, 0, 0.32, 0.1, T);
-    if (opts.sash) part('box', opts.sash, 0.36, 0.08, 0.22, 0, 0.0, 0, T);
-    if (opts.vest) part('box', opts.vest, 0.36, 0.3, 0.215, 0, 0.32, 0, T);
+    part('rbox', top || skin, 0.35, 0.52, 0.22, 0, 0.24, 0, T);
+    if (opts.female) part('rbox', top || skin, 0.3, 0.14, 0.1, 0, 0.32, 0.09, T);
+    if (opts.sash) part('rbox', opts.sash, 0.37, 0.09, 0.235, 0, 0.0, 0, T);
+    if (opts.vest) part('rbox', opts.vest, 0.365, 0.3, 0.235, 0, 0.32, 0, T);
     if (opts.jewels) {
       const n = part('torus', '#e8c252', 0.11, 0.11, 0.11, 0, 0.42, 0.06, T, mat('#e8c252', { emissive: '#3a2a00' }));
       n.rotation.x = Math.PI / 2 - 0.25;
@@ -90,20 +98,28 @@ export class Human {
     this.head = pivot(T, 0, 0.56, 0);
     const H = this.head;
     part('sphere', skin, 0.115, 0.13, 0.12, 0, 0.11, 0, H);
-    part('box', skin, 0.03, 0.04, 0.04, 0, 0.1, 0.12, H);
-    if (opts.beard) part('box', HAIR, 0.16, 0.08, 0.06, 0, 0.02, 0.09, H);
-    if (opts.mustache !== false && !opts.female && !opts.child) part('box', HAIR, 0.09, 0.015, 0.02, 0, 0.065, 0.125, H);
+    part('sphere', skin, 0.022, 0.035, 0.03, 0, 0.1, 0.118, H);
+    for (const ex of [-0.04, 0.04]) {
+      part('eye', '#f4efe6', 0.018, 0.012, 0.01, ex, 0.135, 0.108, H);
+      part('eye', '#1b120c', 0.009, 0.009, 0.006, ex, 0.135, 0.117, H);
+    }
+    part('rbox', HAIR, 0.03, 0.008, 0.01, -0.042, 0.158, 0.112, H);
+    part('rbox', HAIR, 0.03, 0.008, 0.01, 0.042, 0.158, 0.112, H);
+    part('sphere', skin, 0.02, 0.03, 0.02, 0.118, 0.11, 0, H);
+    part('sphere', skin, 0.02, 0.03, 0.02, -0.118, 0.11, 0, H);
+    if (opts.beard) part('sphere', HAIR, 0.1, 0.07, 0.06, 0, 0.03, 0.085, H);
+    if (opts.mustache !== false && !opts.female && !opts.child) part('limb', HAIR, 0.075, 0.016, 0.02, 0, 0.068, 0.122, H).rotation.z = Math.PI / 2;
     this._headwear(H, opts.head || 'turban', opts.headColor || pick(['#f4efe2', '#e2b13c', '#c93a2a', '#e8e0cf', '#d2691e']));
 
     this.arms = [];
     const sleeve = opts.sleeves ? top || skin : skin;
     for (const side of [1, -1]) {
       const sh = pivot(T, side * 0.215, 0.46, 0);
-      part('box', sleeve, 0.095, 0.31, 0.1, 0, -0.14, 0, sh);
+      part('limb', sleeve, 0.1, 0.34, 0.1, 0, -0.14, 0, sh);
       const el = pivot(sh, 0, -0.29, 0);
-      part('box', opts.sleeves && opts.longSleeves ? sleeve : skin, 0.085, 0.27, 0.09, 0, -0.13, 0, el);
+      part('limb', opts.sleeves && opts.longSleeves ? sleeve : skin, 0.085, 0.3, 0.088, 0, -0.13, 0, el);
       const hand = pivot(el, 0, -0.29, 0);
-      part('box', skin, 0.08, 0.08, 0.06, 0, 0.01, 0, hand);
+      part('rbox', skin, 0.075, 0.09, 0.045, 0, -0.005, 0, hand);
       if (opts.bangles) part('cyl', '#e8c252', 0.05, 0.03, 0.05, 0, 0.04, 0, hand);
       this.arms.push({ sh, el, hand, side });
     }
@@ -163,9 +179,10 @@ export class Human {
         break;
       case 'veil': {
         part('sphere', HAIR, 0.122, 0.12, 0.125, 0, 0.13, -0.015, H);
-        const v = part('box', color, 0.28, 0.42, 0.25, 0, 0.0, -0.04, H, doubleMat(color));
-        v.scale.set(0.28, 0.42, 0.25);
-        part('hemi', color, 0.14, 0.12, 0.14, 0, 0.14, -0.01, H);
+        // a sari pallu drawn over the head and falling down the back
+        part('hemi', color, 0.138, 0.13, 0.142, 0, 0.12, -0.012, H);
+        const v = part('skirt', color, 0.15, 0.36, 0.13, 0, -0.04, -0.045, H, doubleMat(color));
+        v.rotation.x = 0.12;
         break;
       }
       case 'bald':
@@ -201,6 +218,14 @@ export class Human {
       // seated women tuck the skirt under; standing ones let it hang
       if (seated) { this.skirt.scale.set(0.5, 0.32, 0.55); this.skirt.position.set(0, -0.12, 0.12); }
       else if (this._skirtBase) { this.skirt.scale.copy(this._skirtBase); this.skirt.position.y = this._skirtY; this.skirt.position.z = 0; }
+    }
+    if (this.pose === 'ride') {
+      B.position.y = 0;
+      for (const l of this.legs) { l.hip.rotation.set(-1.15, 0, l.side * 0.42); l.knee.rotation.set(1.25, 0, 0); }
+      this.torso.rotation.x = 0.08 + Math.sin(this.t * 9) * 0.03 * Math.min(1, this.rideBounce || 0);
+      B.position.y = Math.abs(Math.sin(this.t * 9)) * 0.05 * Math.min(1, this.rideBounce || 0);
+      for (const a of this.arms) { a.sh.rotation.set(-0.55, 0, -a.side * 0.12); a.el.rotation.set(-0.85, 0, 0); }
+      return;
     }
     if (seated) {
       B.position.y = 0.3;

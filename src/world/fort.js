@@ -3,13 +3,20 @@ import * as THREE from 'three';
 import { terrainHeight } from './terrain.js';
 import { boxGeo, arcadeGeo, StaticBatch, MATERIALS } from './builder.js';
 import {
-  R_OUTER, R_CITADEL, WALL_H, WALL_T, BASTION_ANGLES, GATES, CONSTRUCTION, ROAD, PROCESSION,
-  BAZAAR, DANCE, PALACE, PORTICO, TEMPLE, TANK, WORLD_R,
+  R_OUTER, R_CITADEL, R_MIDDLE, WALL_H, WALL_T, BASTION_ANGLES, GATES, CONSTRUCTION, ROAD, PROCESSION,
+  BAZAAR, DANCE, PALACE, PORTICO, TEMPLE, TANK, WORLD_R, STABLE,
 } from './layout.js';
 import { rand, rng, pick, clamp, TAU } from '../core/util.js';
 
+function cylGeo(rt, rb, h, n = 16, tile = 4) {
+  const g = new THREE.CylinderGeometry(rt, rb, h, n);
+  const uv = g.attributes.uv;
+  const circ = Math.PI * (rt + rb);
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (uv.getX(i) * circ) / tile, (uv.getY(i) * h) / tile);
+  return g;
+}
 const GEO = {
-  cyl: (rt, rb, h, n = 16) => new THREE.CylinderGeometry(rt, rb, h, n),
+  cyl: (rt, rb, h, n = 16) => cylGeo(rt, rb, h, n),
   dome: (r) => new THREE.SphereGeometry(r, 14, 8, 0, TAU, 0, Math.PI / 2),
   cone: (r, h, n = 12) => new THREE.ConeGeometry(r, h, n),
 };
@@ -31,11 +38,16 @@ export class Fort {
     this.torches = []; // {x,y,z}
     this.reserved = []; // circles that random props should avoid {x,z,r}
     this.flags = [];
+    this.gatePortals = [];
+    this.landmarkSpots = [];
   }
 
   build() {
     this.outerWall();
+    this.middleWall();
     this.citadelWall();
+    this.landmarks();
+    this.stable();
     this.fatehDarwaza();
     this.banjaraGate();
     this.portico();
@@ -104,8 +116,6 @@ export class Fort {
       const A = pts[i], B = pts[(i + 1) % pts.length];
       const midA = (A.a + (B.a < A.a ? B.a + TAU : B.a)) / 2;
       const gate = GATES.find((g) => Math.abs(((g.angle - midA + 3 * Math.PI) % TAU) - Math.PI) < 0.05);
-      const isConstruction = Math.abs(((midA - Math.atan2(CONSTRUCTION.mid.z, CONSTRUCTION.mid.x) + 3 * Math.PI) % TAU) - Math.PI) < 0.05;
-      if (isConstruction) continue; // built live by the construction scene
       if (gate) {
         const gx = R_OUTER * Math.cos(gate.angle) * Math.cos(Math.PI / 24), gz = R_OUTER * Math.sin(gate.angle) * Math.cos(Math.PI / 24);
         const dx = (B.x - A.x), dz = (B.z - A.z), L = Math.hypot(dx, dz);
@@ -157,10 +167,10 @@ export class Fort {
     for (const p of pts) this.bastion(p.x, p.z, 3.6, 8.5);
   }
 
-  gateway(x, z, ux, uz, name) {
+  gateway(x, z, ux, uz, name, dims = {}) {
     const base = terrainHeight(x, z);
     const rot = Math.atan2(-uz, ux);
-    const W = 16, H = 15, D = 7, OW = 6, OH = 10;
+    const { W = 16, H = 15, D = 7, OW = 6, OH = 10, towerR = 5 } = dims;
     const { geo, piers } = arcadeGeo(W, H, D, 1, OW, OH);
     this.batch.add(geo, 'granite', x, base - 0.02, z, rot);
     for (const [x0, x1] of piers) {
@@ -173,10 +183,10 @@ export class Fort {
       this.batch.box(1.1, 1.3, D + 0.2, x + ux * c, base + H + 0.65, z + uz * c, rot, 'granite', 2);
     }
     for (const s of [-1, 1]) {
-      const tx = x + ux * s * (W / 2 + 2.5), tz = z + uz * s * (W / 2 + 2.5);
-      this.bastion(tx, tz, 5, H + 3);
-      this.batch.add(GEO.dome(2.4), 'plasterWhite', tx, base + H + 3.2, tz);
-      this.batch.add(GEO.cyl(2.5, 2.5, 0.4), 'granite', tx, base + H + 3.0, tz);
+      const tx = x + ux * s * (W / 2 + towerR / 2), tz = z + uz * s * (W / 2 + towerR / 2);
+      this.bastion(tx, tz, towerR, H + 3);
+      this.batch.add(GEO.dome(towerR * 0.48), 'plasterWhite', tx, base + H + 3.2, tz);
+      this.batch.add(GEO.cyl(towerR / 2, towerR / 2, 0.4), 'granite', tx, base + H + 3.0, tz);
     }
     // Teak doors standing open, studded with iron spikes against war elephants.
     const nx = -uz, nz = ux; // through-direction
@@ -187,11 +197,11 @@ export class Fort {
       const doorRot = rot + open;
       const cx = Math.cos(doorRot), sz = -Math.sin(doorRot);
       const dcx = hx - ux * s * (OW / 4) * 0 + (cx * -s * OW / 4), dcz = hz + (sz * -s * OW / 4);
-      this.batch.box(OW / 2, OH * 0.72, 0.3, dcx + nx * inward * 2.5, base + OH * 0.36, dcz + nz * inward * 2.5, doorRot, 'wood', 2);
+      this.batch.box(OW / 2, OH * 0.72, 0.3, dcx + nx * inward * (D / 2 - 1), base + OH * 0.36, dcz + nz * inward * (D / 2 - 1), doorRot, 'wood', 2);
       for (let r = 0; r < 4; r++)
         for (let c = 0; c < 3; c++) {
           const off = (c - 1) * 0.85;
-          const px = dcx + nx * inward * 2.5 + cx * off - Math.sin(doorRot) * 0, pz = dcz + nz * inward * 2.5 + sz * off;
+          const px = dcx + nx * inward * (D / 2 - 1) + cx * off, pz = dcz + nz * inward * (D / 2 - 1) + sz * off;
           this.batch.add(GEO.cone(0.09, 0.55, 6), 'iron', px - Math.sin(doorRot) * 0.35 * -inward * s, base + 1.6 + r * 1.4, pz - Math.cos(doorRot) * 0.35 * -inward * s, doorRot, Math.PI / 2 * inward * s, 0);
         }
     }
@@ -414,10 +424,194 @@ export class Fort {
     this.reserved.push({ x, z, r: 18 });
   }
 
+
+  // ------------------------------------------------- middle wall + gate --
+  middleWall() {
+    const n = 20, step = TAU / n;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const a = step / 2 + i * step;
+      pts.push({ x: R_MIDDLE * Math.cos(a), z: R_MIDDLE * Math.sin(a) });
+    }
+    for (let i = 0; i < n; i++) {
+      const A = pts[i], B = pts[(i + 1) % n];
+      const mx = (A.x + B.x) / 2, mz = (A.z + B.z) / 2;
+      if (mx > 0 && Math.abs(mz) < 1) {
+        const L = Math.hypot(B.x - A.x, B.z - A.z), ux = (B.x - A.x) / L, uz = (B.z - A.z) / L;
+        this.wallSegment(A.x, A.z, mx - ux * 7, mz - uz * 7, 8, 3.5);
+        this.wallSegment(mx + ux * 7, mz + uz * 7, B.x, B.z, 8, 3.5);
+        // Bala Hisar Darwaza: the ornate gate of the inner fort
+        this.gateway(mx, mz, ux, uz, 'Bala Hisar Darwaza', { W: 11, H: 11, D: 5, OW: 4.6, OH: 7.4, towerR: 3.4 });
+        const base = terrainHeight(mx, mz);
+        const rot = Math.atan2(-uz, ux);
+        // carved panel above the arch (the famous lion-and-peacock reliefs)
+        this.batch.box(5.2, 2.2, 0.3, mx + 2.65, base + 8.9, mz, rot + Math.PI / 2 * 0, 'plasterWhite', 2);
+        this.batch.add(GEO.cyl(0.55, 0.55, 0.2, 12), 'gold', mx + 2.85, base + 8.9, mz, 0, 0, Math.PI / 2);
+        this.gatePortals.push({ x: mx, z: mz });
+      } else {
+        this.wallSegment(A.x, A.z, B.x, B.z, 8, 3.5);
+      }
+    }
+    for (const p of pts) this.bastion(p.x, p.z, 4.4, 10);
+  }
+
+  roadSpot(s, outer, dist) {
+    const p = ROAD.at(s);
+    let nx = -p.dz, nz = p.dx;
+    const out = nx * p.x + nz * p.z > 0;
+    if (out !== outer) { nx = -nx; nz = -nz; }
+    const x = p.x + nx * dist, z = p.z + nz * dist;
+    return { x, z, rot: Math.atan2(-nx, -nz), tx: p.dx, tz: p.dz, nx, nz };
+  }
+
+  building(x, z, rot, w, d, h, mat, { arches = 0, roofDome = false, vault = false } = {}) {
+    const g = minGround(x, z, Math.max(w, d) / 2);
+    const top = terrainHeight(x, z) + h;
+    const H = top - g + 1;
+    this.batch.box(w, H, d, x, g - 1 + H / 2, z, rot, mat);
+    const fx = Math.sin(rot), fz = Math.cos(rot), cx = Math.cos(rot), cz = -Math.sin(rot);
+    if (arches) {
+      const gf = terrainHeight(x + fx * (d / 2), z + fz * (d / 2));
+      const { geo } = arcadeGeo(w, Math.min(h * 0.75, 7), 0.6, arches, Math.min(2.4, (w / arches) * 0.55), Math.min(h * 0.55, 4.6));
+      this.batch.add(geo, mat, x + fx * (d / 2 + 0.3), gf - 0.3, z + fz * (d / 2 + 0.3), rot);
+      for (let i = 0; i < arches; i++) {
+        const o = -w / 2 + (i + 0.5) * (w / arches);
+        this.batch.box((w / arches) * 0.5, Math.min(h * 0.55, 4.6) * 0.9, 0.1, x + fx * (d / 2 + 0.01) + cx * o, gf + Math.min(h * 0.55, 4.6) * 0.42, z + fz * (d / 2 + 0.01) + cz * o, rot, 'dark');
+      }
+    }
+    // parapet
+    for (const sd of [1, -1]) {
+      this.batch.box(w + 0.3, 0.7, 0.35, x + fx * sd * (d / 2), top + 0.35, z + fz * sd * (d / 2), rot, mat);
+      this.batch.box(0.35, 0.7, d, x + cx * sd * (w / 2), top + 0.35, z + cz * sd * (w / 2), rot, mat);
+    }
+    if (vault) {
+      const v = new THREE.CylinderGeometry(d / 2, d / 2, w, 14, 1, false, 0, Math.PI);
+      this.batch.add(v, mat, x, top, z, rot, 0, Math.PI / 2);
+    }
+    if (roofDome) this.batch.add(GEO.dome(Math.min(w, d) * 0.32), 'plasterWhite', x, top, z);
+    this.physics.addBox(x, z, w / 2 + 0.3, d / 2 + 0.3, rot, top + 1);
+    this.reserved.push({ x, z, r: Math.max(w, d) * 0.62 });
+    return top;
+  }
+
+  landmarks() {
+    const s0 = ROAD.cum[7]; // start of the climb, just past the portico
+    // Habshi Kamans: tall arches spanning the road where the climb begins
+    for (const ds of [26, 36]) {
+      const p = ROAD.at(s0 + ds);
+      const nx = -p.dz, nz = p.dx;
+      const rot = Math.atan2(-nz, nx);
+      const base = terrainHeight(p.x, p.z) - 0.5;
+      const { geo, piers } = arcadeGeo(16, 11, 2.2, 1, 7.4, 8.2);
+      this.batch.add(geo, 'granite', p.x, base, p.z, rot);
+      for (const [a, b] of piers) {
+        const c = (a + b) / 2;
+        this.physics.addBox(p.x + nx * c, p.z + nz * c, (b - a) / 2, 1.1, rot, base + 11);
+      }
+      this.batch.box(16.6, 0.8, 2.6, p.x, base + 11.4, p.z, rot, 'granite');
+      this.reserved.push({ x: p.x + nx * 7, z: p.z + nz * 7, r: 3 }, { x: p.x - nx * 7, z: p.z - nz * 7, r: 3 });
+    }
+    // Granaries (two long vaulted stores)
+    for (const k of [0, 1]) {
+      const sp = this.roadSpot(s0 + 70 + k * 16, true, 11);
+      this.building(sp.x, sp.z, sp.rot, 13, 7, 5.5, 'graniteWarm', { vault: true, arches: 2 });
+    }
+    // Silah Khana: the three-storey armoury
+    {
+      const sp = this.roadSpot(s0 + 125, true, 12);
+      this.building(sp.x, sp.z, sp.rot, 16, 9, 12, 'plasterOchre', { arches: 5 });
+      this.batch.box(16, 0.4, 0.8, sp.x + Math.sin(sp.rot) * 4.9, terrainHeight(sp.x, sp.z) + 8.2, sp.z + Math.cos(sp.rot) * 4.9, sp.rot, 'plasterWhite');
+      this.landmarkSpots.push({ name: 'Silah Khana', ...sp });
+    }
+    // Ramdas Bandikhana: a small, grim stone cell
+    {
+      const sp = this.roadSpot(s0 + 200, false, 9);
+      this.building(sp.x, sp.z, sp.rot, 6, 5, 3.6, 'granite', { arches: 1 });
+    }
+    // The Ibrahim (Taramati) Mosque, with two minarets
+    {
+      const sp = this.roadSpot(s0 + 300, true, 14);
+      const top = this.building(sp.x, sp.z, sp.rot, 14, 9, 7.5, 'plasterWhite', { arches: 3 });
+      const fx = Math.sin(sp.rot), fz = Math.cos(sp.rot), cx = Math.cos(sp.rot), cz = -Math.sin(sp.rot);
+      for (const sd of [-1, 1]) {
+        const mx = sp.x + cx * sd * 7.6 + fx * 4.6, mz = sp.z + cz * sd * 7.6 + fz * 4.6;
+        const g = minGround(mx, mz, 1);
+        this.batch.add(GEO.cyl(0.75, 0.9, top - g + 6, 10), 'plasterWhite', mx, (top + 6 + g) / 2, mz);
+        this.batch.add(GEO.cyl(1.05, 1.05, 0.3, 10), 'plasterWhite', mx, top + 3.2, mz);
+        this.batch.add(GEO.dome(0.85), 'plasterWhite', mx, top + 6, mz);
+        this.batch.add(GEO.cone(0.12, 0.8, 6), 'gold', mx, top + 7.1, mz);
+        this.physics.addCircle(mx, mz, 0.9, top + 7);
+      }
+      this.batch.add(GEO.dome(3.0), 'plasterWhite', sp.x, top, sp.z);
+      this.landmarkSpots.push({ name: 'Ibrahim Mosque', ...sp });
+    }
+  }
+
+  // ---------------------------------------------- caravanserai & stables --
+  stable() {
+    const { x, z } = STABLE;
+    const base = terrainHeight(x, z);
+    const W = 44, D = 30;
+    this.horseSpots = [];
+    this.cartSpots = [];
+    // arcaded cells on the south and west sides, open courtyard, entrance to the road (north)
+    const sides = [
+      { cx: x, cz: z + D / 2, rot: 0, w: W, n: 9 },
+      { cx: x - W / 2, cz: z, rot: Math.PI / 2, w: D, n: 6 },
+      { cx: x + W / 2, cz: z, rot: Math.PI / 2, w: D, n: 6 },
+    ];
+    for (const sd of sides) {
+      const { geo, piers } = arcadeGeo(sd.w, 4.6, 0.8, sd.n, 2.6, 3.6);
+      this.batch.add(geo, 'graniteWarm', sd.cx, base - 0.02, sd.cz, sd.rot);
+      const ux = Math.cos(sd.rot), uz = -Math.sin(sd.rot);
+      for (const [a, b] of piers) {
+        const c = (a + b) / 2;
+        this.physics.addBox(sd.cx + ux * c, sd.cz + uz * c, (b - a) / 2, 0.45, sd.rot, base + 4.6);
+      }
+      // back wall + roof of the cells
+      const ox = -Math.sin(sd.rot) * (sd.cz > z || sd.cx > x ? 1 : -1), oz = -Math.cos(sd.rot) * (sd.cz > z || sd.cx > x ? 1 : -1);
+      void ox; void oz;
+    }
+    const roof = (cx, cz, w, d) => this.batch.box(w, 0.5, d, cx, base + 4.85, cz, 0, 'graniteWarm');
+    roof(x, z + D / 2 + 2, W + 1, 4.8);
+    roof(x - W / 2 - 2, z, 4.8, D);
+    roof(x + W / 2 + 2, z, 4.8, D);
+    this.batch.box(W + 8, 4.6, 0.8, x, base + 2.3, z + D / 2 + 4.2, 0, 'graniteWarm');
+    this.batch.box(0.8, 4.6, D, x - W / 2 - 4.2, base + 2.3, z, 0, 'graniteWarm');
+    this.batch.box(0.8, 4.6, D, x + W / 2 + 4.2, base + 2.3, z, 0, 'graniteWarm');
+    this.physics.addBox(x, z + D / 2 + 4.2, W / 2 + 4, 0.4, 0, base + 5);
+    this.physics.addBox(x - W / 2 - 4.2, z, 0.4, D / 2, 0, base + 5);
+    this.physics.addBox(x + W / 2 + 4.2, z, 0.4, D / 2, 0, base + 5);
+    // north wall with a big entrance arch toward the road
+    for (const sd of [-1, 1]) {
+      this.batch.box(W / 2 - 4, 4.6, 0.8, x + sd * (W / 4 + 2), base + 2.3, z - D / 2, 0, 'graniteWarm');
+      this.physics.addBox(x + sd * (W / 4 + 2), z - D / 2, W / 4 - 2, 0.4, 0, base + 5);
+    }
+    const { geo } = arcadeGeo(8, 7, 1.4, 1, 5, 5.6);
+    this.batch.add(geo, 'graniteWarm', x, base - 0.02, z - D / 2, 0);
+    this.batch.add(GEO.dome(1.6), 'plasterWhite', x, base + 7, z - D / 2);
+    // water troughs, hay, hitching rails
+    this.batch.box(6, 0.8, 1.2, x - 8, base + 0.4, z + 2, 0, 'granite', 2);
+    this.physics.addBox(x - 8, z + 2, 3, 0.6, 0, base + 0.8);
+    for (let i = 0; i < 6; i++) this.batch.add(GEO.cyl(0.9, 1.1, 1.2, 10), 'thatch', x + 12 + (i % 3) * 2.2, base + 0.6 + Math.floor(i / 3) * 1.1, z + 9);
+    this.physics.addCircle(x + 14, z + 9, 3.2, base + 2.2);
+    for (const rx of [-14, 2]) {
+      this.batch.box(10, 0.15, 0.15, x + rx + 5, base + 1.1, z - 6, 0, 'woodDark');
+      for (const px of [0, 5, 10]) this.batch.box(0.15, 1.2, 0.15, x + rx + px, base + 0.6, z - 6, 0, 'woodDark');
+    }
+    for (let i = 0; i < 4; i++) this.horseSpots.push({ x: x - 13 + i * 4.5, z: z - 4, yaw: Math.PI });
+    this.horseSpots.push({ x: x - 10, z: z - D / 2 - 7, yaw: -Math.PI / 2 });
+    this.cartSpots.push({ x: x + 12, z: z + 1, yaw: Math.PI / 2 });
+    this.cartSpots.push({ x: x + 24, z: z - D / 2 - 8, yaw: -Math.PI / 2 });
+    this.torches.push({ x: x - 4, y: base + 4, z: z - D / 2 - 1 }, { x: x + 4, y: base + 4, z: z - D / 2 - 1 });
+    this.reserved.push({ x, z, r: 30 });
+  }
+
   // ---------------------------------------------------------- the town ---
   isFree(x, z, r) {
     const rr = Math.hypot(x, z);
     if (rr > R_OUTER - 10 - r || rr < R_CITADEL + 8 + r) return false;
+    if (Math.abs(rr - R_MIDDLE) < 9 + r) return false;
     if (ROAD.distance(x, z) < 7 + r || PROCESSION.distance(x, z) < 6.5 + r) return false;
     if (x > BAZAAR.x0 - 14 && x < BAZAAR.x1 + 14 && Math.abs(z) < 22 + r) return false;
     if (Math.hypot(x - DANCE.x, z - DANCE.z) < 22 + r) return false;
@@ -472,10 +666,12 @@ export class Fort {
       placed++;
     }
     // Outside the walls: a scattering of thatched village huts.
-    for (let i = 0, n = 0; i < 600 && n < 22; i++) {
+    for (let i = 0, n = 0; i < 1500 && n < 46; i++) {
       const a = rand(0, TAU), r = rand(R_OUTER + 25, WORLD_R - 25);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
-      if (ROAD.distance(x, z) < 10 || Math.abs(Math.atan2(z, x)) < 0.12) continue;
+      if (ROAD.distance(x, z) < 10 || PROCESSION.distance(x, z) < 8 || Math.abs(Math.atan2(z, x)) < 0.12) continue;
+      const cm = CONSTRUCTION.mid;
+      if (Math.hypot(x - cm.x, z - cm.z) < 50 || Math.hypot(x - STABLE.x, z - STABLE.z) < 34) continue;
       if (this.reserved.some((c) => c.x !== undefined && Math.hypot(x - c.x, z - c.z) < c.r + 4)) continue;
       const g = minGround(x, z, 2.5);
       this.batch.add(GEO.cyl(2.4, 2.5, 2.6, 10), 'mud', x, g + 1.2, z);
@@ -506,15 +702,17 @@ export class Fort {
       for (const c of this.reserved) if (c.x !== undefined && Math.hypot(x - c.x, z - c.z) < c.r + s) return false;
       if (x > BAZAAR.x0 - 16 && x < BAZAAR.x1 + 16 && Math.abs(z) < 24) return false;
       if (Math.hypot(x - DANCE.x, z - DANCE.z) < 22) return false;
+      if (Math.hypot(x - STABLE.x, z - STABLE.z) < 34) return false;
+      if (Math.abs(rr - R_MIDDLE) < 8 + s) return false;
       const cm = CONSTRUCTION.mid;
       if (Math.hypot(x - (cm.x + CONSTRUCTION.inward.x * 20), z - (cm.z + CONSTRUCTION.inward.z * 20)) < 38) return false;
       rocks.push({ x, z, s });
       if (s > 1.2) this.physics.addCircle(x, z, s * 0.9, terrainHeight(x, z) + s * 1.4);
       return true;
     };
-    for (let i = 0, n = 0; i < 3000 && n < 260; i++) {
+    for (let i = 0, n = 0; i < 4000 && n < 340; i++) {
       const a = rand(0, TAU);
-      const r = rng() < 0.7 ? rand(30, 115) : rand(R_OUTER + 12, WORLD_R);
+      const r = rng() < 0.6 ? rand(30, 113) : rand(R_OUTER + 12, WORLD_R + 20);
       const s = r < 115 ? rand(0.6, 3.2) : rand(0.6, 4.2);
       if (tryRock(Math.cos(a) * r, Math.sin(a) * r, s)) n++;
       // cluster companions
@@ -524,7 +722,7 @@ export class Fort {
       }
     }
     // a couple of the famous balancing-rock stacks outside the walls
-    for (const [x, z] of [[230, -80], [-210, 120], [60, -240], [-150, -200], [240, 120]]) {
+    for (const [x, z] of [[300, -110], [-230, 140], [60, -290], [-180, -240], [300, 150], [-330, -20], [140, 330]]) {
       rocks.push({ x, z, s: 4.5 }, { x: x + 0.8, z: z - 0.3, s: 3.0, lift: 6.5 }, { x: x - 0.4, z: z + 0.5, s: 2.0, lift: 10.6 });
       this.physics.addCircle(x, z, 4.4, terrainHeight(x, z) + 14);
     }
@@ -543,12 +741,14 @@ export class Fort {
 
     // ---- trees: neem, tamarind and banyan-ish canopies ----
     const trees = [];
-    for (let i = 0, n = 0; i < 4000 && n < 190; i++) {
-      const a = rand(0, TAU), r = rng() < 0.55 ? rand(R_CITADEL + 10, R_OUTER - 10) : rand(R_OUTER + 10, WORLD_R + 20);
+    for (let i = 0, n = 0; i < 6000 && n < 300; i++) {
+      const a = rand(0, TAU), r = rng() < 0.45 ? rand(R_CITADEL + 10, R_OUTER - 10) : rand(R_OUTER + 10, WORLD_R + 30);
       const x = Math.cos(a) * r, z = Math.sin(a) * r;
       if (terrainHeight(x, z) > 30) continue;
       if (r < R_OUTER && !this.isFree(x, z, 2.5)) continue;
-      if (r >= R_OUTER && (ROAD.distance(x, z) < 6 || Math.abs(r - R_OUTER) < 12)) continue;
+      if (r >= R_OUTER && (ROAD.distance(x, z) < 6 || PROCESSION.distance(x, z) < 5 || Math.abs(r - R_OUTER) < 12)) continue;
+      if (Math.hypot(x - STABLE.x, z - STABLE.z) < 34) continue;
+      { const cm = CONSTRUCTION.mid; if (Math.hypot(x - cm.x, z - cm.z) < 45) continue; }
       if (r >= R_OUTER && this.reserved.some((c) => c.x !== undefined && Math.hypot(x - c.x, z - c.z) < c.r + 2)) continue;
       trees.push({ x, z, s: rand(0.8, 1.5), kind: rng() < 0.15 ? 'palm' : 'broad' });
       this.reserved.push({ x, z, r: 2.5 });

@@ -4,7 +4,7 @@ import { Input } from './core/input.js';
 import { Audio } from './core/audio.js';
 import { Hud, PLACES } from './core/hud.js';
 import { Player } from './core/player.js';
-import { initMaterials } from './world/builder.js';
+import { initMaterials, preloadTextures } from './world/builder.js';
 import { buildTerrain } from './world/terrain.js';
 import { Fort } from './world/fort.js';
 import { Sky } from './world/sky.js';
@@ -15,6 +15,13 @@ import { Procession } from './life/procession.js';
 import { DanceCourt } from './life/dance.js';
 import { Bazaar } from './life/bazaar.js';
 import { Townsfolk } from './life/townsfolk.js';
+import { Mounts, loadHorseModel } from './life/mounts.js';
+import { Grass } from './world/grass.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 const canvas = document.getElementById('game');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -23,9 +30,29 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.1, 2500);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.15, 5000);
+// ---- post-processing: ambient occlusion, a touch of bloom, filmic output
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+gtao.updateGtaoMaterial({ radius: 0.6, distanceExponent: 1.5, thickness: 1.2, scale: 1.1, samples: 12 });
+gtao.blendIntensity = 0.85;
+composer.addPass(gtao);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.22, 0.5, 0.92);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const quality = { high: !matchMedia('(pointer: coarse)').matches && new URLSearchParams(location.search).get('q') !== 'low' };
+function applyQuality() {
+  gtao.enabled = quality.high;
+  bloom.enabled = quality.high;
+  renderer.setPixelRatio(Math.min(devicePixelRatio, quality.high ? 1.5 : 1));
+  composer.setPixelRatio(Math.min(devicePixelRatio, quality.high ? 1.25 : 1));
+  composer.setSize(innerWidth, innerHeight);
+}
+applyQuality();
 addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 });
@@ -36,7 +63,8 @@ const hud = new Hud();
 const state = { coins: 60, inventory: [], zone: null, danceTime: 0, constructionTime: 0, lastProcAlert: -999, lineIdx: new Map(), talking: null };
 let world;
 
-function buildWorld() {
+async function buildWorld() {
+  const [horseModel] = await Promise.all([loadHorseModel(), preloadTextures()]);
   initMaterials();
   const physics = new Physics();
   buildTerrain(scene);
@@ -44,7 +72,10 @@ function buildWorld() {
   const pop = new Population(scene, physics);
   // the dance court and bazaar add torches, so they must exist before fort.build() lights them
   fort.outerWall();
+  fort.middleWall();
   fort.citadelWall();
+  fort.landmarks();
+  fort.stable();
   fort.fatehDarwaza();
   fort.banjaraGate();
   fort.portico();
@@ -62,8 +93,11 @@ function buildWorld() {
   const procession = new Procession(scene, pop, audio);
   const town = new Townsfolk(scene, physics, pop, fort);
   const sky = new Sky(scene, renderer);
+  const mounts = new Mounts(scene, physics, pop, audio, fort, horseModel);
+  const grass = new Grass(scene, physics, quality.high ? 1 : 0.45);
   const player = new Player(scene, physics, camera);
-  player.spawn(224, 0.5, -Math.PI / 2);
+  player.spawn(444, 0.5, -Math.PI / 2);
+  player.mountOn(mounts.playerHorse);
   hud.buildMapImage(fort);
   // a handful of warm lights for night time in the busiest places
   const lights = [];
@@ -73,7 +107,7 @@ function buildWorld() {
     scene.add(l);
     lights.push(l);
   }
-  world = { physics, fort, pop, construction, procession, dance, bazaar, town, sky, player, lights };
+  world = { physics, fort, pop, construction, procession, dance, bazaar, town, sky, player, lights, mounts, grass };
 }
 
 // ------------------------------------------------------------ helpers --
@@ -188,6 +222,18 @@ function frame() {
   }
   if (input.hit('Escape')) { hud.close(); document.getElementById('help').classList.remove('show'); }
   if (input.hit('KeyN')) { audio.setMuted(audio.enabled); hud.toast(audio.enabled ? 'Sound on' : 'Sound off'); }
+  if (input.hit('KeyG')) { quality.high = !quality.high; applyQuality(); hud.toast(quality.high ? 'Graphics: high (ambient occlusion + bloom)' : 'Graphics: fast'); }
+  if (input.hit('KeyF') && !hud.open) {
+    if (player.mount) player.dismount();
+    else {
+      const m = W.mounts.nearest(player.pos);
+      if (m) {
+        player.mountOn(m);
+        hud.toast(m.kind === 'horse' ? '<b>W</b> to walk on, hold <b>Shift</b> to gallop, <b>A/D</b> to steer, <b>F</b> to dismount.' : '<b>W/S</b> to drive the bullocks, <b>A/D</b> to steer, <b>F</b> to climb down.');
+        if (m.kind === 'cart') hud.complete('cart', audio);
+      }
+    }
+  }
   if (input.hit('KeyT')) { sky.hour = (sky.hour + 2) % 24; hud.toast(`Two hours pass… <b>${sky.timeLabel}</b>`); }
   const inPortico = Math.hypot(player.pos.x - PORTICO.x, player.pos.z - PORTICO.z) < 5;
   if (input.hit('KeyC') || input.hit('Digit3')) {
@@ -238,7 +284,9 @@ function frame() {
 
   input.enabled = !panelOpen;
   // ---- simulation ----
-  player.update(dt, input, pop.actors);
+  W.mounts.update(dt, camera.position, null, player.pos);
+  const others = [...pop.actors, ...W.mounts.list.filter((m) => m !== player.mount)];
+  player.update(dt, input, others, W.mounts);
   input.enabled = true;
   W.construction.update(dt, elapsed, player.pos);
   W.procession.update(dt);
@@ -248,6 +296,7 @@ function frame() {
   W.town.update(dt, king);
   pop.update(dt, camera.position);
   sky.update(dt, player.pos);
+  W.grass.update(dt, camera.position);
   W.fort.update(dt, elapsed, sky.night);
   for (const l of W.lights) l.intensity = sky.night * 60 * (0.9 + Math.sin(elapsed * 13 + l.position.x) * 0.1);
   audio.update(dt, { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: player.yaw + Math.PI }, { night: sky.night });
@@ -260,6 +309,7 @@ function frame() {
     state.zone = zone;
     if (zone.name === 'Fateh Darwaza' || (zone.name !== 'The Deccan Plain' && Math.hypot(player.pos.x, player.pos.z) < 185)) hud.complete('gate', audio);
     if (zone.name === 'Moti Bazaar') hud.complete('bazaar', audio);
+    if (zone.name === 'Fateh Darwaza' && player.mount?.kind === 'horse') hud.complete('ride', audio);
     if (zone.name === 'Mahakali Shrine') hud.complete('temple', audio);
   }
   if (Math.hypot(player.pos.x, player.pos.z + 4) < 13 && player.pos.y > W.fort.hallFloorY - 0.2) hud.complete('summit', audio);
@@ -280,7 +330,14 @@ function frame() {
   if (kd < 22) hud.complete('procession', audio);
 
   // ---- prompt ----
-  if (!hud.open) {
+  const nearMount = !player.mount && W.mounts.nearest(player.pos, 3.2);
+  if (!hud.open && player.mount && Math.abs(player.mount.speed) < 0.6) {
+    hud.setPrompt(`<b>[F]</b> ${player.mount.kind === 'horse' ? 'Dismount' : 'Climb down'} · <b>W</b> ${player.mount.kind === 'horse' ? 'ride on' : 'drive on'}`);
+  } else if (!hud.open && nearMount) {
+    hud.setPrompt(`<b>[F]</b> ${nearMount.kind === 'horse' ? 'Ride the horse' : 'Drive the bullock cart'}`);
+  } else if (!hud.open && player.mount) {
+    hud.setPrompt('');
+  } else if (!hud.open) {
     const a = nearestTalkable();
     if (a) hud.setPrompt(`<b>[E]</b> ${a.stall ? 'Trade with' : 'Talk to'} ${a.name || ({ worker: 'the porter', mason: 'the mason', guard: 'the guard', citizen: 'the townsperson', shopper: 'the shopper', dancer: 'the dancer', musician: 'the musician', audience: 'the spectator', noble: 'the noble', courtier: 'the courtier', servant: 'the servant', herald: 'the herald', drummer: 'the drummer', banner: 'the standard bearer', water: 'the water bearer', priest: 'the priest' }[a.role] || 'them')}`);
     else if (inPortico) hud.setPrompt('<b>[C]</b> Clap beneath the dome');
@@ -290,15 +347,15 @@ function frame() {
   hud.setStatus(state.coins, sky.timeLabel);
   hud.drawMini({ x: player.pos.x, z: player.pos.z, facing: player.model.root.rotation.y }, player.yaw, king);
   input.endFrame();
-  renderer.render(scene, camera);
+  composer.render(dt);
   window.__calls = renderer.info.render.calls;
 }
 
 // -------------------------------------------------------------- start --
 const startBtn = document.getElementById('start');
-setTimeout(() => {
+setTimeout(async () => {
   const t0 = performance.now();
-  buildWorld();
+  await buildWorld();
   console.log(`world built in ${Math.round(performance.now() - t0)} ms, ${world.pop.actors.length} actors`);
   renderer.compile(scene, camera);
   startBtn.disabled = false;
@@ -309,7 +366,7 @@ startBtn.addEventListener('click', () => {
   document.getElementById('intro').classList.add('hide');
   audio.start();
   if (input.canLock) input.lock();
-  setTimeout(() => hud.toast('Walk west through <b>Fateh Darwaza</b>. Press <b>J</b> for your journal, <b>M</b> for the map.'), 1200);
+  setTimeout(() => hud.toast('You ride in on the Bhagnagar road. Follow it west to <b>Fateh Darwaza</b>. <b>W</b> ride · <b>Shift</b> gallop · <b>F</b> dismount · <b>J</b> journal · <b>M</b> map.'), 1200);
 });
 window.__game = () => world;
 void BAZAAR; void TEMPLE; void PROCESSION_VIEW; void PLACES;

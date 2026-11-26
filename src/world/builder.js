@@ -5,29 +5,67 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import * as TX from '../core/textures.js';
 
 export const MATERIALS = {};
+const loader = new THREE.TextureLoader();
+const TEX_CACHE = new Map();
+/** Loads a CC0 Poly Haven texture set from public/textures/<id>/. */
+export function pbrSet(id, repeat = 1) {
+  const load = (file, srgb) => {
+    const key = id + file;
+    let base = TEX_CACHE.get(key);
+    if (!base) {
+      base = loader.load(`textures/${id}/${file}.jpg`);
+      base.wrapS = base.wrapT = THREE.RepeatWrapping;
+      base.anisotropy = 8;
+      if (srgb) base.colorSpace = THREE.SRGBColorSpace;
+      TEX_CACHE.set(key, base);
+    }
+    const t = base.clone();
+    t.repeat.set(repeat, repeat);
+    return t;
+  };
+  return { map: load('diffuse', true), normalMap: load('nor_gl', false), roughnessMap: load('rough', false) };
+}
+
+const ALL_SETS = ['japanese_stone_wall', 'medieval_blocks_05', 'rock_boulder_dry', 'plastered_wall_02', 'worn_plaster_wall', 'weathered_brown_planks', 'brown_mud_dry', 'dry_ground_rocks', 'red_laterite_soil_stones'];
+/** Loads every texture up front so clones made later already have their image. */
+export async function preloadTextures() {
+  const jobs = [];
+  for (const id of ALL_SETS)
+    for (const [file, srgb] of [['diffuse', true], ['nor_gl', false], ['rough', false]]) {
+      jobs.push(loader.loadAsync(`textures/${id}/${file}.jpg`).then((t) => {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping;
+        t.anisotropy = 8;
+        if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+        TEX_CACHE.set(id + file, t);
+      }).catch((e) => console.warn('texture failed', id, file, e)));
+    }
+  await Promise.all(jobs);
+}
+
 export function initMaterials() {
-  const L = (o) => new THREE.MeshLambertMaterial(o);
+  const S = (o) => new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, ...o });
+  const pbr = (id, repeat, color = '#ffffff', extra = {}) => S({ ...pbrSet(id, repeat), color, normalScale: new THREE.Vector2(1, 1), ...extra });
   Object.assign(MATERIALS, {
-    granite: L({ map: TX.granite(7) }),
-    graniteWarm: L({ map: TX.granite(11, ['#a89480', '#b39f88', '#9c8a76', '#bba890']) }),
-    rubble: L({ color: '#8b8175' }),
-    plaster: L({ map: TX.plaster('#ece2cc', 3) }),
-    plasterOchre: L({ map: TX.plaster('#e2c28e', 4) }),
-    plasterRose: L({ map: TX.plaster('#e3b9a0', 5) }),
-    plasterWhite: L({ map: TX.plaster('#f4efe4', 6) }),
-    mud: L({ color: '#a9774f' }),
-    wood: L({ map: TX.wood(5) }),
-    woodDark: L({ color: '#4a2f1b' }),
-    iron: L({ color: '#3a3a3e' }),
-    gold: L({ color: '#e0b84a', emissive: '#3a2600' }),
-    dark: L({ color: '#2a1e16' }),
-    thatch: L({ color: '#b8995a' }),
-    tile: L({ color: '#b5583a' }),
-    floor: L({ map: TX.floorTiles() }),
-    saffron: L({ color: '#f08a24', side: THREE.DoubleSide }),
-    green: L({ color: '#2a7a3b', side: THREE.DoubleSide }),
-    earth: L({ color: '#9a6b45' }),
-    bamboo: L({ color: '#b59a5c' }),
+    granite: pbr('japanese_stone_wall', 1.6, '#d8d2c8'),
+    graniteWarm: pbr('medieval_blocks_05', 1.2, '#e6dccd'),
+    rubble: pbr('rock_boulder_dry', 1, '#b8afa4'),
+    plaster: pbr('plastered_wall_02', 0.8, '#f0e4cc'),
+    plasterOchre: pbr('plastered_wall_02', 0.8, '#e6c793'),
+    plasterRose: pbr('plastered_wall_02', 0.8, '#ecc3aa'),
+    plasterWhite: pbr('plastered_wall_02', 0.8, '#fbf7ef'),
+    mud: pbr('worn_plaster_wall', 0.8, '#c4946a'),
+    wood: pbr('weathered_brown_planks', 1, '#ffffff'),
+    woodDark: pbr('weathered_brown_planks', 1, '#6b5040'),
+    iron: S({ color: '#3a3a3e', roughness: 0.5, metalness: 0.8 }),
+    gold: S({ color: '#e0b84a', roughness: 0.3, metalness: 1.0 }),
+    dark: S({ color: '#1e1612', roughness: 1 }),
+    thatch: S({ color: '#b8995a', roughness: 1 }),
+    tile: S({ color: '#b5583a', roughness: 0.8 }),
+    floor: S({ map: TX.floorTiles(), roughness: 0.55 }),
+    saffron: S({ color: '#f08a24', side: THREE.DoubleSide, roughness: 0.9 }),
+    green: S({ color: '#2a7a3b', side: THREE.DoubleSide, roughness: 0.9 }),
+    earth: pbr('brown_mud_dry', 1, '#ffffff'),
+    bamboo: S({ color: '#b59a5c', roughness: 0.8 }),
   });
   return MATERIALS;
 }

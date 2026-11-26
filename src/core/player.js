@@ -42,13 +42,61 @@ export class Player {
     this.camPos.set(x - Math.sin(facing) * 6, this.pos.y + 3, z - Math.cos(facing) * 6);
   }
 
-  setEmote(pose, dur = 2.5) { this.emote = pose; this.emoteT = dur; }
+  setEmote(pose, dur = 2.5) { if (!this.mount) { this.emote = pose; this.emoteT = dur; } }
 
-  update(dt, input, actors) {
+  mountOn(m) {
+    this.mount = m;
+    m.rider = this;
+    this.emote = null;
+    this.vel.set(0, 0, 0);
+    this.footDist = this.dist;
+    this.dist = m.kind === 'horse' ? 8 : 9.5;
+  }
+
+  dismount() {
+    const m = this.mount;
+    if (!m) return;
+    m.rider = null;
+    m.speed = 0;
+    this.mount = null;
+    // step off on the left-hand side
+    const lx = Math.cos(m.yaw), lz = -Math.sin(m.yaw);
+    const side = m.kind === 'horse' ? 1.3 : 1.7;
+    const x = m.pos.x + lx * side, z = m.pos.z + lz * side;
+    this.pos.set(x, this.physics.groundAt(x, z, m.pos.y + 1), z);
+    this.physics.resolve(this.pos, this.radius, this.pos.y + 0.05, this.pos.y + 1.7);
+    this.model.root.rotation.set(0, m.yaw, 0);
+    this.dist = this.footDist || 6.5;
+  }
+
+  update(dt, input, actors, mounts) {
     const sens = 0.0026;
+    const looking = Math.abs(input.look.dx) + Math.abs(input.look.dy) > 0;
+    if (looking) this.lastLook = 0; else this.lastLook = (this.lastLook || 0) + dt;
     this.yaw -= input.look.dx * sens;
     this.pitch = clamp(this.pitch + input.look.dy * sens, -0.35, 1.25);
-    this.dist = clamp(this.dist + input.wheel * 0.6, 2.5, 14);
+    this.dist = clamp(this.dist + input.wheel * 0.6, 2.5, 18);
+
+    if (this.mount) {
+      const m = this.mount;
+      mounts.ride(m, dt, input, actors);
+      m.seat.updateWorldMatrix(true, false);
+      m.seat.getWorldPosition(this.pos);
+      this.model.root.rotation.set(0, m.yaw, 0);
+      this.model.pose = m.kind === 'horse' ? 'ride' : 'sit';
+      this.model.rideBounce = Math.abs(m.speed) / 8;
+      this.model.speed = 0;
+      this.model.update(dt);
+      // the camera swings round behind the mount when you ride and leave the mouse alone
+      if (Math.abs(m.speed) > 1 && this.lastLook > 0.8) {
+        let d = m.yaw + Math.PI - this.yaw;
+        d = Math.atan2(Math.sin(d), Math.cos(d));
+        this.yaw += d * Math.min(1, dt * 2.2);
+      }
+      this.grounded = true;
+      this.updateCamera(dt);
+      return;
+    }
 
     // movement relative to camera
     let fx = 0, fz = 0;

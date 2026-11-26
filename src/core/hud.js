@@ -1,19 +1,21 @@
 // DOM heads-up display: location banner, prompts, dialogue, shop,
 // journal, minimap and the full map with fast travel.
 import { terrainHeight } from '../world/terrain.js';
-import { ROAD, PROCESSION, R_OUTER, R_CITADEL, BAZAAR, DANCE, PALACE, TEMPLE, TANK, PORTICO, CONSTRUCTION, WORLD_R, BASTION_ANGLES } from '../world/layout.js';
+import { STABLE, R_MIDDLE, ROAD, PROCESSION, R_OUTER, R_CITADEL, BAZAAR, DANCE, PALACE, TEMPLE, TANK, PORTICO, CONSTRUCTION, WORLD_R, BASTION_ANGLES } from '../world/layout.js';
 
 const $ = (id) => document.getElementById(id);
 export const releaseMouse = () => document.pointerLockElement && document.exitPointerLock();
 
 export const OBJECTIVES = [
   { id: 'gate', text: 'Enter Golconda through Fateh Darwaza' },
-  { id: 'clap', text: 'Clap beneath the portico inside the gate (C)' },
+  { id: 'ride', text: 'Ride a horse through Fateh Darwaza' },
+  { id: 'cart', text: 'Drive a bullock cart (F)' },
+  { id: 'clap', text: 'Clap beneath the portico at Bala Hisar Darwaza (C)' },
   { id: 'bazaar', text: 'Wander through the Moti Bazaar' },
   { id: 'pearls', text: 'Buy pearls from a pearl merchant' },
   { id: 'spices', text: 'Buy spices for the road' },
   { id: 'dance', text: 'Watch a performance at the Nritya Mandap' },
-  { id: 'construction', text: 'Watch the masons raise the new rampart' },
+  { id: 'construction', text: 'Watch the masons at the Naya Qila works' },
   { id: 'procession', text: 'Witness the Sultan\'s procession' },
   { id: 'greet', text: 'Greet the Sultan with a namaste (1) when he is near' },
   { id: 'temple', text: 'Visit the Mahakali shrine on the hill' },
@@ -22,16 +24,17 @@ export const OBJECTIVES = [
 
 export const PLACES = [
   { name: 'Fateh Darwaza', x: 205, z: 0, icon: 'gate', above: true, spawn: { x: 200, z: 2 } },
+  { name: 'Caravanserai', x: STABLE.x, z: STABLE.z, icon: 'horse', spawn: { x: STABLE.x, z: STABLE.z - 22 } },
   { name: 'Moti Bazaar', x: 150, z: 0, icon: 'bazaar', spawn: { x: 150, z: 2 } },
   { name: 'Nritya Mandap', x: DANCE.x, z: DANCE.z, icon: 'dance', spawn: { x: DANCE.x, z: DANCE.z + 15 } },
-  { name: 'New Rampart', x: CONSTRUCTION.mid.x + CONSTRUCTION.inward.x * 12, z: CONSTRUCTION.mid.z + CONSTRUCTION.inward.z * 12, icon: 'build', spawn: { x: CONSTRUCTION.mid.x + CONSTRUCTION.inward.x * 36, z: CONSTRUCTION.mid.z + CONSTRUCTION.inward.z * 36 } },
+  { name: 'Naya Qila Works', x: CONSTRUCTION.mid.x + CONSTRUCTION.inward.x * 12, z: CONSTRUCTION.mid.z + CONSTRUCTION.inward.z * 12, icon: 'build', spawn: { x: CONSTRUCTION.mid.x + CONSTRUCTION.inward.x * 36, z: CONSTRUCTION.mid.z + CONSTRUCTION.inward.z * 36 } },
   { name: 'Royal Palace', x: PALACE.x, z: PALACE.z, icon: 'palace', spawn: { x: PALACE.x, z: PALACE.z - 22 } },
   { name: 'Bala Hisar', x: 0, z: -4, icon: 'crown', spawn: { x: 0, z: 20 } },
   { name: 'Mahakali Shrine', x: TEMPLE.x, z: TEMPLE.z, icon: 'temple', above: true, spawn: { x: TEMPLE.x + 9, z: TEMPLE.z } },
   { name: 'Step Tank', x: TANK.x, z: TANK.z, icon: 'water', spawn: { x: TANK.x, z: TANK.z + 14 } },
 ];
 
-const ICONS = { gate: '⛩', bazaar: '◆', dance: '♪', build: '⚒', palace: '◈', crown: '♛', temple: '▲', water: '≈' };
+const ICONS = { horse: '♞', gate: '⛩', bazaar: '◆', dance: '♪', build: '⚒', palace: '◈', crown: '♛', temple: '▲', water: '≈' };
 
 export class Hud {
   constructor() {
@@ -177,6 +180,10 @@ export class Hud {
     ctx.closePath();
     ctx.stroke();
     ctx.beginPath();
+    ctx.arc(...P(0, 0), R_MIDDLE * px, 0, Math.PI * 2);
+    ctx.lineWidth = 3.5 * px;
+    ctx.stroke();
+    ctx.beginPath();
     ctx.arc(...P(0, 0), R_CITADEL * px, 0, Math.PI * 2);
     ctx.lineWidth = 3 * px;
     ctx.stroke();
@@ -204,6 +211,8 @@ export class Hud {
     ctx.fillRect(...P(DANCE.x - 7, DANCE.z - 7), 14 * px, 14 * px);
     ctx.fillStyle = '#e3b9a0';
     ctx.fillRect(...P(PALACE.x - 13, PALACE.z - 6), 26 * px, 12 * px);
+    ctx.fillStyle = '#c9a77a';
+    ctx.fillRect(...P(STABLE.x - 24, STABLE.z - 16), 48 * px, 34 * px);
     ctx.fillStyle = '#4f7f86';
     ctx.fillRect(...P(TANK.x - TANK.w / 2, TANK.z - TANK.d / 2), TANK.w * px, TANK.d * px);
     ctx.fillStyle = '#fff';

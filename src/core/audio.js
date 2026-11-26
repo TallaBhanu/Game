@@ -181,6 +181,24 @@ export class Audio {
     }
   }
 
+  hoof(v = 0.5) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    const n = v > 0.6 ? 4 : 2;
+    for (let i = 0; i < n; i++) {
+      const tt = t + i * (v > 0.6 ? 0.07 : 0.16);
+      this._tone(this.master, tt, 'sine', 150, 70, 0.09, 0.22);
+      this._noiseBurst(this.master, tt, 0.05, 700, 1, 'bandpass', 0.18);
+    }
+  }
+
+  creak() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._tone(this.master, t, 'sawtooth', 210 + Math.random() * 60, 180, 0.25, 0.025);
+    this._noiseBurst(this.master, t, 0.2, 300, 0.7, 'lowpass', 0.12);
+  }
+
   chime() {
     if (!this.ctx) return;
     const t = this.ctx.currentTime;
