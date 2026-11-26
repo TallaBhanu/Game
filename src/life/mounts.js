@@ -8,8 +8,14 @@ import { clamp, lerp, rand, pick } from '../core/util.js';
 import { turnTowards, yawTo } from './npc.js';
 
 export async function loadHorseModel() {
+  const loader = new GLTFLoader();
   try {
-    return await new GLTFLoader().loadAsync('models/Horse.glb');
+    return await loader.loadAsync('models/Horse.glb');
+  } catch {
+    // some static hosts refuse .glb; the same model as embedded glTF JSON
+  }
+  try {
+    return await loader.loadAsync('models/Horse.json');
   } catch (e) {
     console.warn('Horse model failed to load', e);
     return null;
