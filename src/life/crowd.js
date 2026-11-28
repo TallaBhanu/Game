@@ -4,8 +4,8 @@
 import { RealHuman, COMMON_DYES } from './realistic.js';
 import { ASSETS } from './assets.js';
 
-const POOL = { man: 24, woman: 10 };
-const RANGE = 42;
+const POOL = { man: 28, woman: 16 };
+const RANGE = 55;
 
 export function kindOf(actor) {
   const o = actor.opts || {};
@@ -83,6 +83,7 @@ export class Crowd {
         a._id ??= idSeq++;
         if (h.kind === 'man') h.setDye(dyeFor(a));
         h.root.visible = true;
+        h.fresh = true;
         a.setBodyVisible(false);
       }
     }

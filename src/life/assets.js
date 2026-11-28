@@ -8,9 +8,14 @@ import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 export const ASSETS = { clips: {}, ok: false };
 
+// Some static hosts will not serve .glb; the same bytes are also published
+// with a .wasm extension (served as plain binary), which GLTFLoader reads fine.
 async function load(name) {
-  try { return await loader.loadAsync(`models/${name}.glb`); } catch { /* host may refuse .glb */ }
-  try { return await loader.loadAsync(`models/${name}.json`); } catch (e) { console.warn('model failed', name, e); return null; }
+  const order = location.pathname.includes('/_f/') || /claudeusercontent|claude\.ai/.test(location.hostname) ? ['wasm', 'glb'] : ['glb', 'wasm'];
+  for (const ext of order) {
+    try { return await loader.loadAsync(`models/${name}.${ext}`); } catch (e) { if (ext === order[1]) console.warn('model failed', name, e); }
+  }
+  return null;
 }
 
 // Real-world heights (m) and the direction each model faces after loading.

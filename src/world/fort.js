@@ -7,6 +7,7 @@ import {
   BAZAAR, DANCE, PALACE, PORTICO, TEMPLE, TANK, WORLD_R, STABLE, NAGINA_BAGH, BAOLI, STEPS,
 } from './layout.js';
 import { rand, rng, pick, clamp, TAU } from '../core/util.js';
+import { ENV, scatter } from './env.js';
 
 function cylGeo(rt, rb, h, n = 16, tile = 4) {
   const g = new THREE.CylinderGeometry(rt, rb, h, n);
@@ -820,9 +821,29 @@ export class Fort {
       rocks.push({ x, z, s: 4.5 }, { x: x + 0.8, z: z - 0.3, s: 3.0, lift: 6.5 }, { x: x - 0.4, z: z + 0.5, s: 2.0, lift: 10.6 });
       this.physics.addCircle(x, z, 4.4, terrainHeight(x, z) + 14);
     }
-    const rockMesh = new THREE.InstancedMesh(rockGeo, new THREE.MeshLambertMaterial({ color: '#ffffff' }), rocks.length);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), col = new THREE.Color();
-    rocks.forEach((r, i) => {
+    const realRocks = ['namaqualand_boulder_02', 'namaqualand_boulder_03', 'namaqualand_boulder_04', 'namaqualand_boulder_05'].filter((n) => ENV[n]);
+    if (realRocks.length) {
+      // photo-scanned granite boulders
+      const groups = Object.fromEntries(realRocks.map((n) => [n, []]));
+      rocks.forEach((r, i) => {
+        const n = realRocks[i % realRocks.length];
+        const sc = (r.s * 1.25) / ENV[n].radius;
+        groups[n].push({ x: r.x, y: terrainHeight(r.x, r.z) + (r.lift ?? 0) - 0.12 * sc, z: r.z, rotY: rand(0, TAU), rotX: rand(-0.1, 0.1), scale: sc, sy: rand(0.8, 1.15) });
+      });
+      for (const [n, items] of Object.entries(groups)) scatter(this.scene, n, items, { far: 320 });
+      // loose stones everywhere on the hill and the plain
+      const small = { rock_07: [], rock_09: [] };
+      for (let i = 0; i < 700; i++) {
+        const a = rand(0, TAU), rr = rng() < 0.5 ? rand(25, 120) : rand(R_OUTER + 8, WORLD_R);
+        const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+        if (ROAD.distance(x, z) < 3.5 || PROCESSION.distance(x, z) < 3.5 || this.physics.blocked(x, z, terrainHeight(x, z) + 0.3)) continue;
+        small[i % 2 ? 'rock_07' : 'rock_09'].push({ x, y: terrainHeight(x, z) - 0.05, z, rotY: rand(0, TAU), scale: rand(0.25, 1.1) });
+      }
+      for (const [n, items] of Object.entries(small)) scatter(this.scene, n, items, { shadow: false, far: 90 });
+    }
+    const rockMesh = new THREE.InstancedMesh(rockGeo, new THREE.MeshLambertMaterial({ color: '#ffffff' }), realRocks.length ? 0 : rocks.length);
+    if (!realRocks.length) rocks.forEach((r, i) => {
       const y = terrainHeight(r.x, r.z) + (r.lift ?? r.s * 0.35);
       q.setFromEuler(e.set(rand(-0.2, 0.2), rand(0, TAU), rand(-0.2, 0.2)));
       m.compose(new THREE.Vector3(r.x, y, r.z), q, new THREE.Vector3(r.s * rand(1, 1.4), r.s * rand(0.8, 1.1), r.s * rand(0.9, 1.3)));
@@ -844,12 +865,13 @@ export class Fort {
       if (Math.hypot(x - STABLE.x, z - STABLE.z) < 34) continue;
       { const cm = CONSTRUCTION.mid; if (Math.hypot(x - cm.x, z - cm.z) < 45) continue; }
       if (r >= R_OUTER && this.reserved.some((c) => c.x !== undefined && Math.hypot(x - c.x, z - c.z) < c.r + 2)) continue;
-      trees.push({ x, z, s: rand(0.8, 1.5), kind: rng() < 0.15 ? 'palm' : 'broad' });
+      trees.push({ x, z, s: rand(0.8, 1.5), kind: rng() < 0.15 && !ENV.island_tree_01 ? 'palm' : 'broad' });
       this.reserved.push({ x, z, r: 2.5 });
       n++;
     }
     // a few shade trees around the bazaar and dance court
     for (const [x, z] of [[126, 18], [172, -16], [104, -66], [140, -86], [118, 24], [168, 20]]) trees.push({ x, z, s: 1.5, kind: 'broad' });
+    if (ENV.island_tree_01) { this.realTrees(trees); return; }
     const broad = trees.filter((t) => t.kind === 'broad');
     const palms = trees.filter((t) => t.kind === 'palm');
     const trunkGeo = new THREE.CylinderGeometry(0.22, 0.35, 1, 6);
@@ -884,6 +906,40 @@ export class Fort {
       }
     });
     for (const im of [trunks, canopies, fronds]) { im.castShadow = true; im.receiveShadow = true; this.scene.add(im); }
+    this.trees = trees;
+  }
+
+  realTrees(trees) {
+    // photo-scanned trees: island trees as the common shade trees, small trees
+    // in town, a few great spreading jacarandas out on the plain
+    const kinds = ['island_tree_01', 'island_tree_02', 'tree_small_02', 'jacaranda_tree'].filter((n) => ENV[n]);
+    const groups = Object.fromEntries(kinds.map((n) => [n, []]));
+    for (const t of trees) {
+      const outside = Math.hypot(t.x, t.z) > R_OUTER;
+      let n = pick(['island_tree_01', 'island_tree_02', 'island_tree_01']);
+      if (!outside && rng() < 0.3) n = 'tree_small_02';
+      if (outside && rng() < 0.18) n = 'jacaranda_tree';
+      if (!ENV[n]) n = kinds[0];
+      const target = n === 'jacaranda_tree' ? rand(9, 13) : n === 'tree_small_02' ? rand(4.5, 6.5) : rand(7, 11) * (t.s / 1.15);
+      const sc = target / ENV[n].height;
+      const y = terrainHeight(t.x, t.z) - 0.15;
+      groups[n].push({ x: t.x, y, z: t.z, rotY: rand(0, TAU), scale: sc });
+      this.physics.addCircle(t.x, t.z, 0.4 + target * 0.02, y + target);
+    }
+    for (const [n, items] of Object.entries(groups)) scatter(this.scene, n, items);
+    // shrubs and bushes in the grassy patches
+    const shrubs = { shrub_02: [], shrub_03: [], shrub_04: [] };
+    const keys = Object.keys(shrubs).filter((n) => ENV[n]);
+    for (let i = 0; i < 550 && keys.length; i++) {
+      const a = rand(0, TAU), rr = rng() < 0.4 ? rand(R_CITADEL + 6, R_OUTER - 8) : rand(R_OUTER + 8, WORLD_R + 20);
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      const y = terrainHeight(x, z);
+      if (ROAD.distance(x, z) < 4 || PROCESSION.distance(x, z) < 4 || this.physics.blocked(x, z, y + 0.3)) continue;
+      if (rr < R_OUTER && !this.isFree(x, z, 1)) continue;
+      const n = keys[i % keys.length];
+      shrubs[n].push({ x, y: y - 0.05, z, rotY: rand(0, TAU), scale: rand(1.2, 2.6) / ENV[n].height });
+    }
+    for (const [n, items] of Object.entries(shrubs)) scatter(this.scene, n, items, { shadow: false, far: 120 });
     this.trees = trees;
   }
 

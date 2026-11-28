@@ -1,27 +1,11 @@
 // Horses and bullock carts you can ride, plus traffic on the roads.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Human, part, mat, draftBull } from './characters.js';
 import { MATERIALS } from '../world/builder.js';
 import { ROAD, R_OUTER, PALACE, BAZAAR, TANK } from '../world/layout.js';
 import { clamp, lerp, rand, pick } from '../core/util.js';
 import { turnTowards, yawTo } from './npc.js';
 import { spawn, ASSETS } from './assets.js';
-
-export async function loadHorseModel() {
-  const loader = new GLTFLoader();
-  try {
-    return await loader.loadAsync('models/Horse.glb');
-  } catch {
-    // some static hosts refuse .glb; the same model as embedded glTF JSON
-  }
-  try {
-    return await loader.loadAsync('models/Horse.json');
-  } catch (e) {
-    console.warn('Horse model failed to load', e);
-    return null;
-  }
-}
 
 const COATS = ['#8a5a36', '#5a3a24', '#d8cfc0', '#3a2a20', '#a8774a', '#f2ece2'];
 

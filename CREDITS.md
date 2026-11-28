@@ -19,6 +19,10 @@ Converted for the web (renamed bones, fewer polygons, smaller textures, unused a
 
 - `Xbot.glb` (idle, walk, run, nod, head shake) and `Michelle.glb` (samba dance) from the [three.js examples](https://github.com/mrdoob/three.js/tree/r170/examples/models/gltf) (MIT licence for the repository; Mixamo-sourced animations).
 
+## Environment models
+
+- [Poly Haven](https://polyhaven.com) (CC0): island_tree_01, island_tree_02, tree_small_02, jacaranda_tree (trunks simplified, foliage rebuilt as leaf cards from the original leaf atlases), namaqualand_boulder_02–05, rock_07, rock_09, shrub_02–04, brass_pot_01/02, brass_vase_01, ceramic_pot, planter_pot_clay, wooden_crate_01, wooden_bucket_01, wooden_barrels_01, bananas, food_pomegranate_01, wooden_lantern_01, brass_diya_lantern, cannon_01.
+
 ## Textures
 
 - [Poly Haven](https://polyhaven.com) (CC0): japanese_stone_wall, medieval_blocks_05, dry_ground_rocks, red_laterite_soil_stones, brown_mud_dry, rock_boulder_dry, plastered_wall_02, worn_plaster_wall, weathered_brown_planks.

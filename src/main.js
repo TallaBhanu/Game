@@ -15,11 +15,13 @@ import { Procession } from './life/procession.js';
 import { DanceCourt } from './life/dance.js';
 import { Bazaar } from './life/bazaar.js';
 import { Townsfolk } from './life/townsfolk.js';
-import { Mounts, loadHorseModel } from './life/mounts.js';
+import { Mounts } from './life/mounts.js';
 import { Grass } from './world/grass.js';
 import { loadAssets } from './life/assets.js';
 import { Crowd } from './life/crowd.js';
 import { Animals } from './life/animals.js';
+import { loadEnv, wind, updateEnv } from './world/env.js';
+import { decorate } from './world/decor.js';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
@@ -70,6 +72,7 @@ async function buildWorld() {
   const btn = document.getElementById('start');
   const [horseModel] = await Promise.all([
     Promise.resolve(null),
+    loadEnv(),
     preloadTextures(),
     loadAssets((f) => { btn.textContent = `Loading people & animals… ${Math.round(f * 100)}%`; }),
   ]);
@@ -107,6 +110,7 @@ async function buildWorld() {
   const crowd = new Crowd(scene, pop);
   crowd.extra = [...mounts.drivers, procession.mahout];
   const animals = new Animals(scene, physics);
+  decorate(scene, physics, fort, bazaar);
   const player = new Player(scene, physics, camera);
   player.spawn(444, 0.5, -Math.PI / 2);
   player.mountOn(mounts.playerHorse);
@@ -312,6 +316,8 @@ function frame() {
   W.animals.update(dt, camera.position);
   sky.update(dt, player.pos);
   W.grass.update(dt, camera.position);
+  wind.value += dt;
+  updateEnv(camera.position);
   W.fort.update(dt, elapsed, sky.night);
   for (const l of W.lights) l.intensity = sky.night * 60 * (0.9 + Math.sin(elapsed * 13 + l.position.x) * 0.1);
   audio.update(dt, { x: camera.position.x, y: camera.position.y, z: camera.position.z, yaw: player.yaw + Math.PI }, { night: sky.night });

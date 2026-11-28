@@ -18,6 +18,8 @@ You ride in on horseback along the road from Bhagnagar and explore a living, ful
 
 People and animals are realistic, rigged 3D models (CC BY, from Sketchfab: see [CREDITS.md](CREDITS.md)): townsmen in kurtas, women in saris, Akhal-Teke horses, black Deccani draught bulls, the royal elephant, donkeys and camels. One set of Mixamo animations (walk, idle, run, dance, gestures) is retargeted onto every human body at runtime, with procedural pose layers for sitting, bowing, carrying loads on the head, hammering, drumming and riding. To keep it fast, the nearest ~34 people get realistic bodies and everyone further away is drawn with a light stand-in.
 
+Trees, granite boulders, shrubs and props (brass and clay pots, crates, barrels, fruit, lanterns, bronze cannons) are photo-scanned Poly Haven models. The trees keep their real trunks and leaf textures; their millions of leaf triangles are rebuilt as alpha-tested leaf cards (`tools/prepare-trees.mjs`) and drawn with GPU instancing, swaying in the wind.
+
 It is built with [three.js]. The architecture is procedural. Surfaces use real, CC0-licensed photo-scanned textures from [Poly Haven] (granite, red Deccan laterite soil, plaster, timber). The sky is a physically based daylight model that also lights the scene, and post-processing adds ambient occlusion and bloom. The horse model comes from the three.js examples. Press **G** to switch between high and fast graphics.
 
 ## Run it
@@ -69,6 +71,9 @@ src/
   world/grass.js       instanced dry-grass tufts with wind
 public/textures/       CC0 PBR texture sets (Poly Haven)
 public/models/         glTF models (prepared with tools/prepare-models.mjs)
+public/models/env/     trees, rocks, shrubs, props (tools/prepare-trees.mjs, prepare-models.mjs)
+  world/env.js         instanced environment models + wind
+  world/decor.js       market goods, doorway pots, cannons
 tools/                 model preparation scripts (rename bones, simplify, compress)
 viewer.html            dev-only model/pose viewer (npm run dev, then open /viewer.html)
   life/assets.js       model loading + Mixamo retargeting
@@ -97,3 +102,7 @@ The game is a loving reconstruction, not a survey. The layout follows the real f
 
 [three.js]: https://threejs.org
 [Poly Haven]: https://polyhaven.com
+
+## Publishing as a static page
+
+Some static hosts (including claude.ai artifacts) refuse `.glb` files and block `data:` URLs. The loaders therefore also look for each model under the same name with a `.wasm` extension: copy `dist/models/**/*.glb` to `*.wasm` when publishing to such a host.

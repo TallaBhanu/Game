@@ -76,7 +76,8 @@ export class RealHuman {
       ts = Math.max(0.4, speed / 1.35);
     }
     if (pose === 'pull' && speed > 0.05) ts = 0.5;
-    b.play(clip, 0.35, ts);
+    b.play(clip, this.fresh ? 0 : 0.35, ts);
+    this.fresh = false;
     b.mixer.update(dt);
     b.root.updateMatrixWorld(true);
     // this body was skinned in an A-pose; pull its arms in for still clips
